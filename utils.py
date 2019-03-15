@@ -57,17 +57,10 @@ special_chars = {
     ' ': 'kg'
 }
 
-def convLongPath(file_path, file_name):
-    if len(file_name) > 128:
-        file_name = hashlib.sha1(file_name).hexdigest()
-    if len(file_path) > 128:
-        file_path = file_path[0] + hashlib.sha1(file_path).hexdigest()
-    return file_path, file_name
-
 def trans_to_local_link(url):
     '''
     @param
-        url: 待处理的url
+        url: 待处理的url, 有时url为动态链接, 包含&, ?等特殊字符, 这种情况下需要对其进行编码.
     @return
         file_path: 目标文件的存储目录, 相对路径(不以/开头), 为""时, 表示当前目录
         file_name: 目标文件名称
@@ -79,25 +72,30 @@ def trans_to_local_link(url):
     urlObj = urlparse(url)
     origin_host = urlObj.netloc
     origin_path = urlObj.path
+    origin_query = urlObj.query
 
     local_path = origin_path
-    ## 替换url中的特殊字符, 因为存储在本地的文件名称不能包含特殊字符 
-    for k, v in special_chars.items():
-        if k in local_path: local_path = local_path.replace(k, v)
 
     # url除去最后的/
     if local_path.endswith('/'): local_path += 'index.html'
 
+    if origin_query != '': 
+        query_str = origin_query
+        for k, v in special_chars.items():
+            if k in query_str: query_str = query_str.replace(k, v)
+        local_path = special_chars['?'] + query_str
+
     ## 如果该url就是这个站点域名下的，那么无需新建域名目录存放
     ## 如果是其他站点的(需要事先开启允许下载其他站点的配置), 
-    ## 则要将资源存放在以站点域名为名的目录下, 路径中仍然需要保留域名部分
-    if origin_host != main_site: local_path = origin_host + local_path
+    ## 则要将资源存放在以站点域名为名的目录下, 路径中仍然需要保留域名部分.
+    ## 有时host中可能包含冒号, 需要转义.
+    if origin_host != main_site: 
+        local_path = origin_host.replace(':', special_chars[':']) + local_path
 
-    file_name = os.path.basename(local_path)
     file_path = os.path.dirname(local_path)
+    file_name = os.path.basename(local_path)
     # 如果文件名或文件路径过长
     ## file_path, file_name = convLongPath(file_path, file_name)
 
     if origin_host != main_site: local_path = '/' + local_path
-
     return file_path, file_name, local_path

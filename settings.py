@@ -1,5 +1,5 @@
 # 要爬取的网站url, 需要以http(s)开头
-main_url = 'https://91dizhi-at-gmail-com-0201.p17.rocks/forumdisplay.php?fid=19'
+main_url = 'http://97daimeng.com/'
 
 # 设置代理
 proxies = {}
@@ -35,7 +35,7 @@ outsite_asset = True
 
 # 爬取页面的深度, 从1开始计, 爬到第N层为止.
 # 1表示只抓取单页, 0表示无限制
-max_depth = 0
+max_depth = 2
 # 请求出错最大重试次数（超时也算出错）
 max_retry_times = 5
 
