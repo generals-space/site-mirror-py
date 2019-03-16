@@ -19,7 +19,7 @@ def request_get_async(url, refer):
     '''
     try:
         _headers = headers.copy()
-        _headers['Referer'] = refer
+        _headers['Referer'] = refer.encode('utf-8')
         resp = requests.get(url=url, verify=True, headers=_headers, proxies=proxies)
         return (1, resp)
     except requests.exceptions.ConnectionError as err:
