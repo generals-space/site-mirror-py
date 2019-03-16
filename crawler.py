@@ -22,19 +22,24 @@ class Crawler:
         ## 初始化数据文件, 创建表
         self.db_conn = init_db(settings.site_db)
         self.load_queue()
-        self.page_queue.put((main_url, '', 1, 0))
+        self.enqueue_page(main_url, '', 1)
 
-        self.document_task = WorkerPool(self.page_queue, self.get_html_page, doc_pool_max)
-        self.source_task = WorkerPool(self.asset_queue, self.get_static_asset, res_pool_max)
+        self.page_worker = WorkerPool(self.page_queue, self.get_html_page, doc_pool_max)
+        self.asset_worker = WorkerPool(self.asset_queue, self.get_static_asset, res_pool_max)
 
     def start(self):
-        self.document_task.start()
+        self.page_worker.start()
 
     def get_html_page(self, request_url, refer, depth, failed_times):
         '''
         抓取目标页面
         '''
-        if 0 < max_depth < depth or failed_times > max_retry_times: return
+        if 0 < max_depth and max_depth < depth: 
+            print('目标url: %s 已超过最大深度' % request_url)
+            return
+        if failed_times > max_retry_times:
+            print('目标url: %s 失败次数过多' % request_url)
+            return
         code, resp = request_get_async(request_url, refer)
         if not code:
             print('请求页面失败, 重新入队列 %s' % request_url)
@@ -44,11 +49,17 @@ class Crawler:
         resp.encoding = charset
         pq_selector = PyQuery(resp.text)
 
-        parse_linking_assets(pq_selector, request_url, depth, callback = self.enqueue_asset)
-        parse_linking_pages(pq_selector, request_url, depth, callback = self.enqueue_page)
+        ## 超过最大深度的页面不再抓取, 在入队列前就先判断.
+        ## 但超过静态文件无所谓深度, 所以还是要抓取的.
+        if 0 < max_depth and max_depth < depth + 1:
+            print('当前页面: %s 已达到最大深度, 不再抓取新页面')
+        else:
+            parse_linking_pages(pq_selector, request_url, depth+1, callback = self.enqueue_page)
+
+        parse_linking_assets(pq_selector, request_url, depth+1, callback = self.enqueue_asset)
 
         ## 抓取此页面上的静态文件
-        self.source_task.start()
+        self.asset_worker.start()
         byte_content = pq_selector.outer_html().encode('utf-8')
         file_path, file_name, _ = trans_to_local_link(request_url)
         code, data = save_file_async(file_path, file_name, byte_content)
@@ -78,12 +89,12 @@ class Crawler:
         已进入队列的url, 必定已经存在记录, 但不一定能成功下载.
         '''
         if not query_url_record(self.db_conn, url):
-            self.asset_queue.put((url, refer, depth + 1, 0))
+            self.asset_queue.put((url, refer, depth, 0))
             add_url_record(self.db_conn, url, refer, depth)
 
     def enqueue_page(self, url, refer, depth):
         if not query_url_record(self.db_conn, url):
-            self.page_queue.put((url, refer, depth + 1, 0))
+            self.page_queue.put((url, refer, depth, 0))
             add_url_record(self.db_conn, url, refer, depth)
 
     def load_queue(self):
@@ -129,7 +140,7 @@ class Crawler:
         任务停止前存储队列以便之后继续
         '''
         print('用户取消, 正在终止...')
-        self.document_task.stop()
-        self.source_task.stop()
+        self.page_worker.stop()
+        self.asset_worker.stop()
         self.save_queue()
         self.db_conn.close()
