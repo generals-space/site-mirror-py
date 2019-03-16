@@ -23,10 +23,10 @@ def request_get_async(url, refer):
         resp = requests.get(url=url, verify=True, headers=_headers, proxies=proxies)
         return (1, resp)
     except requests.exceptions.ConnectionError as err:
-        print('连接异常: ', err)
+        print('连接异常 %s : %s' % (url, err))
         return (0, err)
     except Exception as err:
-        print('请求失败: ', err)
+        print('请求失败 %s: %s' % (url, err))
         return (0, err)
 
 def save_file_async(file_path, file_name, byte_content):
