@@ -52,7 +52,7 @@ class Crawler:
         ## 超过最大深度的页面不再抓取, 在入队列前就先判断.
         ## 但超过静态文件无所谓深度, 所以还是要抓取的.
         if 0 < max_depth and max_depth < depth + 1:
-            print('当前页面: %s 已达到最大深度, 不再抓取新页面')
+            print('当前页面: %s 已达到最大深度, 不再抓取新页面' % request_url)
         else:
             parse_linking_pages(pq_selector, request_url, depth+1, callback = self.enqueue_page)
 
