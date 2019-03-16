@@ -3,6 +3,7 @@ import re
 import requests
 import time
 import sqlite3
+import copy
 from urllib.parse import urlparse, urljoin
 from queue import Queue
 
@@ -19,6 +20,11 @@ class Crawler:
     def __init__(self):
         self.page_queue = Queue()
         self.asset_queue = Queue()
+        self.page_counter = 0
+        self.asset_counter = 0
+        self._tmp_page_queue = None
+        self._tmp_asset_queue = None
+
         ## 初始化数据文件, 创建表
         self.db_conn = init_db(settings.site_db)
         self.load_queue()
@@ -42,27 +48,31 @@ class Crawler:
             return
         code, resp = request_get_async(request_url, refer)
         if not code:
-            print('请求页面失败, 重新入队列 %s' % request_url)
+            print('请求页面失败 %s, referer %s, 重新入队列 %s' % (request_url, refer))
             self.page_queue.put((request_url, refer, depth, failed_times + 1))
             return
-        charset = get_page_charset(resp.content)
-        resp.encoding = charset
-        pq_selector = PyQuery(resp.text)
 
-        ## 超过最大深度的页面不再抓取, 在入队列前就先判断.
-        ## 但超过静态文件无所谓深度, 所以还是要抓取的.
-        if 0 < max_depth and max_depth < depth + 1:
-            print('当前页面: %s 已达到最大深度, 不再抓取新页面' % request_url)
-        else:
-            parse_linking_pages(pq_selector, request_url, depth+1, callback = self.enqueue_page)
+        try:
+            charset = get_page_charset(resp.content)
+            resp.encoding = charset
+            pq_selector = PyQuery(resp.text)
 
-        parse_linking_assets(pq_selector, request_url, depth+1, callback = self.enqueue_asset)
+            ## 超过最大深度的页面不再抓取, 在入队列前就先判断.
+            ## 但超过静态文件无所谓深度, 所以还是要抓取的.
+            if 0 < max_depth and max_depth < depth + 1:
+                print('当前页面: %s 已达到最大深度, 不再抓取新页面' % request_url)
+            else:
+                parse_linking_pages(pq_selector, request_url, depth+1, callback = self.enqueue_page)
 
-        ## 抓取此页面上的静态文件
-        self.asset_worker.start()
-        byte_content = pq_selector.outer_html().encode('utf-8')
-        file_path, file_name, _ = trans_to_local_link(request_url)
-        code, data = save_file_async(file_path, file_name, byte_content)
+            ## parse_linking_assets(pq_selector, request_url, depth+1, callback = self.enqueue_asset)
+
+            ## 抓取此页面上的静态文件
+            ## self.asset_worker.start()
+            byte_content = pq_selector.outer_html().encode('utf-8')
+            file_path, file_name, _ = trans_to_local_link(request_url)
+            code, data = save_file_async(file_path, file_name, byte_content)
+        except Exception as err:
+            print('parse page failed: %s' %err)
 
     def get_static_asset(self, request_url, refer, depth, failed_times):
         '''
@@ -73,7 +83,7 @@ class Crawler:
 
         code, resp = request_get_async(request_url, refer)
         if not code:
-            ## print('请求静态资源失败, 重新入队列 %s' % request_url)
+            print('请求静态资源失败 %s, referer %s, 重新入队列' % (request_url, refer))
             ## 出现异常, 则失败次数加1
             self.asset_queue.put((request_url, refer, depth, failed_times + 1))
             return
@@ -87,15 +97,26 @@ class Crawler:
         '''
         如果该url已经添加入url_records记录, 就不再重新入队列.
         已进入队列的url, 必定已经存在记录, 但不一定能成功下载.
+        每50个url入队列都将队列内容备份到数据库, 以免丢失.
         '''
-        if not query_url_record(self.db_conn, url):
-            self.asset_queue.put((url, refer, depth, 0))
-            add_url_record(self.db_conn, url, refer, depth)
+        if query_url_record(self.db_conn, url): return
+
+        self.asset_queue.put((url, refer, depth, 0))
+        add_url_record(self.db_conn, url, refer, depth)
+        self.asset_counter += 1
+        if self.asset_counter >= 50: 
+            self.asset_counter = 0
+            self.save_queue()
 
     def enqueue_page(self, url, refer, depth):
-        if not query_url_record(self.db_conn, url):
-            self.page_queue.put((url, refer, depth, 0))
-            add_url_record(self.db_conn, url, refer, depth)
+        if query_url_record(self.db_conn, url): return
+
+        self.page_queue.put((url, refer, depth, 0))
+        add_url_record(self.db_conn, url, refer, depth)
+        self.page_counter += 1
+        if self.page_counter >= 50: 
+            self.page_counter = 0
+            self.save_queue()
 
     def load_queue(self):
         print('初始化任务队列')
@@ -115,9 +136,10 @@ class Crawler:
         '''
         print('保存任务队列')
         page_tasks = []
+        self._tmp_page_queue = copy.copy(self.page_queue)
         while True:
-            if not self.page_queue.empty():
-                item = self.page_queue.get()
+            if not self._tmp_page_queue.empty():
+                item = self._tmp_page_queue.get()
                 page_tasks.append(tuple(item))
             else:
                 break
@@ -125,9 +147,10 @@ class Crawler:
             save_page_task(self.db_conn, page_tasks)
 
         asset_tasks = []
+        self._tmp_asset_queue = copy.copy(self.asset_queue)
         while True:
-            if not self.asset_queue.empty():
-                item = self.asset_queue.get()
+            if not self._tmp_asset_queue.empty():
+                item = self._tmp_asset_queue.get()
                 asset_tasks.append(tuple(item))
             else:
                 break
