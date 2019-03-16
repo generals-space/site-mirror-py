@@ -14,7 +14,7 @@ from page_parser import get_page_charset, parse_linking_pages, parse_linking_ass
 from utils import request_get_async, save_file_async, trans_to_local_link
 import settings
 from worker_pool import WorkerPool
-from db import init_db, query_url_record, add_url_record, query_page_tasks, query_asset_tasks, save_page_task, save_asset_task
+from db import init_db, query_url_record, add_url_record, query_page_tasks, query_asset_tasks, save_page_task, save_asset_task, update_record_to_success
 
 class Crawler:
     def __init__(self):
@@ -60,7 +60,7 @@ class Crawler:
             ## 超过最大深度的页面不再抓取, 在入队列前就先判断.
             ## 但超过静态文件无所谓深度, 所以还是要抓取的.
             if 0 < max_depth and max_depth < depth + 1:
-                print('当前页面: %s 已达到最大深度, 不再抓取新页面' % request_url)
+                print('当前页面: %s 已达到最大深度, 不再抓取新页面' % (request_url, ))
             else:
                 parse_linking_pages(pq_selector, request_url, depth+1, callback = self.enqueue_page)
 
@@ -71,6 +71,7 @@ class Crawler:
             byte_content = pq_selector.outer_html().encode('utf-8')
             file_path, file_name, _ = trans_to_local_link(request_url)
             code, data = save_file_async(file_path, file_name, byte_content)
+            if code: self.set_record_to_success(request_url)
         except Exception as err:
             print('parse page failed: %s' %err)
 
@@ -83,7 +84,7 @@ class Crawler:
 
         code, resp = request_get_async(request_url, refer)
         if not code:
-            print('请求静态资源失败 %s, referer %s, 重新入队列' % (request_url, refer))
+            print('请求静态资源失败 %s, 重新入队列' % (request_url, ))
             ## 出现异常, 则失败次数加1
             self.asset_queue.put((request_url, refer, depth, failed_times + 1))
             return
@@ -92,6 +93,7 @@ class Crawler:
             content = parse_css_file(resp.text, request_url, depth, callback = self.enqueue_asset)
         file_path, file_name, _ = trans_to_local_link(request_url)
         code, data = save_file_async(file_path, file_name, content)
+        if code: self.set_record_to_success(request_url)
 
     def enqueue_asset(self, url, refer, depth):
         '''
@@ -157,6 +159,9 @@ class Crawler:
         if len(asset_tasks) > 0:
             save_asset_task(self.db_conn, asset_tasks)
         print('保存任务队列完成')
+
+    def set_record_to_success(self, url):
+        update_record_to_success(self.db_conn, url)
 
     def stop(self):
         '''

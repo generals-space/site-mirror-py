@@ -13,7 +13,8 @@ def init_db(db_file):
         id bigint primary key, 
         url varchar(512) unique, -- '已抓取过的url(可以是页面, 可以是静态资源), 唯一, 作为索引键'
         refer varchar(512),
-        depth int
+        depth int, 
+        success int default 0
     )
     '''
     cursor.execute(sql_str)
@@ -87,13 +88,22 @@ def query_page_tasks(db_conn):
 def query_asset_tasks(db_conn):
     return query_tasks(db_conn, 'asset_tasks')
 
+def update_record_to_success(db_conn, url):
+    sql_str = 'update url_records set success = 1 where url = ?'
+    cursor = db_conn.cursor()
+    ## 单个元素的写法, 注意如果是元组形式, 必须为逗号结尾.
+    cursor.execute(sql_str, (url,))
+    db_conn.commit()
+    cursor.close()
+
 def save_task(db_conn, table_name, value_list):
     sql_str = 'delete from %s' % table_name
-    db_conn.execute(sql_str)
-
+    cursor = db_conn.cursor()
+    cursor.execute(sql_str)
     sql_str = 'insert into %s(url, refer, depth, failed_times) values(?, ?, ?, ?)' % table_name
-    db_conn.executemany(sql_str, value_list)
+    cursor.executemany(sql_str, value_list)
     db_conn.commit()
+    cursor.close()
 
 def save_page_task(db_conn, value_list):
     save_task(db_conn, 'page_tasks', value_list)
