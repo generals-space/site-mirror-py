@@ -1,7 +1,9 @@
 import os
-import requests
+import re
 import hashlib
 from urllib.parse import urlparse
+
+import requests
 
 from settings import main_url, headers, proxies, output_path
 
@@ -57,10 +59,11 @@ special_chars = {
     ' ': 'kg'
 }
 
-def trans_to_local_link(url):
+def trans_to_local_link(url, is_page = True):
     '''
     @param
         url: 待处理的url, 有时url为动态链接, 包含&, ?等特殊字符, 这种情况下需要对其进行编码.
+        is_page: 是否为页面, 包含.php, .asp等动态页面, 区别于常规静态文件. 我们需要根据这个参数判断是否需要对其加上.html后缀.
     @return
         file_path: 目标文件的存储目录, 相对路径(不以/开头), 为""时, 表示当前目录
         file_name: 目标文件名称
@@ -75,7 +78,6 @@ def trans_to_local_link(url):
     origin_query = urlObj.query
 
     local_path = origin_path
-
     # url除去最后的/
     if local_path.endswith('/'): local_path += 'index.html'
 
@@ -83,7 +85,10 @@ def trans_to_local_link(url):
         query_str = origin_query
         for k, v in special_chars.items():
             if k in query_str: query_str = query_str.replace(k, v)
-        local_path = special_chars['?'] + query_str
+        local_path = local_path + special_chars['?'] + query_str
+
+    if is_page and not local_path.endswith('.html') and not local_path.endswith('.htm'):
+        local_path += '.html'
 
     ## 如果该url就是这个站点域名下的，那么无需新建域名目录存放
     ## 如果是其他站点的(需要事先开启允许下载其他站点的配置), 
@@ -94,8 +99,6 @@ def trans_to_local_link(url):
 
     file_path = os.path.dirname(local_path)
     file_name = os.path.basename(local_path)
-    # 如果文件名或文件路径过长
-    ## file_path, file_name = convLongPath(file_path, file_name)
 
     if origin_host != main_site: local_path = '/' + local_path
     return file_path, file_name, local_path
