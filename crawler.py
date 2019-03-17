@@ -5,7 +5,6 @@ import time
 import sqlite3
 import copy
 from urllib.parse import urlparse, urljoin
-from queue import Queue
 
 from pyquery import PyQuery
 
@@ -15,11 +14,12 @@ from utils import request_get_async, save_file_async, trans_to_local_link
 import settings
 from worker_pool import WorkerPool
 from db import init_db, query_url_record, add_url_record, query_page_tasks, query_asset_tasks, save_page_task, save_asset_task, update_record_to_success
+from cache_queue import CacheQueue
 
 class Crawler:
     def __init__(self):
-        self.page_queue = Queue()
-        self.asset_queue = Queue()
+        self.page_queue = CacheQueue()
+        self.asset_queue = CacheQueue()
         self.page_counter = 0
         self.asset_counter = 0
 
@@ -46,8 +46,10 @@ class Crawler:
             return
         code, resp = request_get_async(request_url, refer)
         if not code:
-            print('请求页面失败 %s, referer %s, 重新入队列 %s' % (request_url, refer))
-            self.page_queue.put((request_url, refer, depth, failed_times + 1))
+            ## print('请求页面失败 %s, referer %s, 重新入队列 %s' % (request_url, refer))
+            ## 出现异常, 则失败次数加1
+            ## 不需要调用enqueue(), 直接入队列.
+            self.page_queue.push((request_url, refer, depth, failed_times + 1))
             return
 
         try:
@@ -82,9 +84,9 @@ class Crawler:
 
         code, resp = request_get_async(request_url, refer)
         if not code:
-            print('请求静态资源失败 %s, 重新入队列' % (request_url, ))
+            ## print('请求静态资源失败 %s, 重新入队列' % (request_url, ))
             ## 出现异常, 则失败次数加1
-            self.asset_queue.put((request_url, refer, depth, failed_times + 1))
+            self.asset_queue.push((request_url, refer, depth, failed_times + 1))
             return
         content = resp.content
         if 'content-type' in resp.headers and 'text/css' in resp.headers['content-type']:
@@ -101,7 +103,7 @@ class Crawler:
         '''
         if query_url_record(self.db_conn, url): return
 
-        self.asset_queue.put((url, refer, depth, 0))
+        self.asset_queue.push((url, refer, depth, 0))
         add_url_record(self.db_conn, url, refer, depth)
         self.asset_counter += 1
         if self.asset_counter >= 50: 
@@ -110,7 +112,7 @@ class Crawler:
 
     def enqueue_page(self, url, refer, depth):
         if query_url_record(self.db_conn, url): return
-        self.page_queue.put((url, refer, depth, 0))
+        self.page_queue.push((url, refer, depth, 0))
         add_url_record(self.db_conn, url, refer, depth)
         self.page_counter += 1
         if self.page_counter >= 50: 
@@ -122,11 +124,11 @@ class Crawler:
         page_tasks = query_page_tasks(self.db_conn)
         for task in page_tasks:
             item = (task[0], task[1], int(task[2]), int(task[3]))
-            self.page_queue.put(item)
+            self.page_queue.push(item)
         asset_tasks = query_asset_tasks(self.db_conn)
         for task in asset_tasks:
             item = (task[0], task[1], int(task[2]), int(task[3]))
-            self.asset_queue.put(item)
+            self.asset_queue.push(item)
         print('初始化任务队列完成')
 
     def save_queue(self):
@@ -136,27 +138,18 @@ class Crawler:
         print('保存任务队列')
         page_tasks = []
         asset_tasks = []
-        _tmp_page_queue = Queue()
-        _tmp_asset_queue = Queue()
-
-        try:
-            ## 这里只能用deepcopy, 浅拷贝不行.
-            _tmp_page_queue = copy.deepcopy(self.page_queue)
-            _tmp_asset_queue = copy.deepcopy(self.asset_queue)
-        except Exception as err:
-            ## 这里会报can't pickle _thread.lock objects
-            ## 但是不影响执行流程(这个异常必须捕捉)
-            print('deepcopy异常: ', err)
+        _tmp_page_queue = copy.copy(self.page_queue)
+        _tmp_asset_queue = copy.copy(self.asset_queue)
 
         ## 将队列中的成员写入数据库作为备份
         while True:
             if _tmp_page_queue.empty(): break
-            item = _tmp_page_queue.get()
+            item = _tmp_page_queue.pop()
             page_tasks.append(tuple(item))
 
         while True:
             if _tmp_asset_queue.empty(): break
-            item = _tmp_asset_queue.get()
+            item = _tmp_asset_queue.pop()
             asset_tasks.append(tuple(item))
 
         if len(page_tasks) > 0:

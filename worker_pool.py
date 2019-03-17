@@ -16,7 +16,7 @@ class WorkerPool:
         while True:
             if self.exit_signal: break
             if not self.queue.empty():
-                t = self.queue.get()
+                t = self.queue.pop()
                 self.pool.spawn(self.worker, *t)
             elif self.pool.free_count() == self.pool.size or self.exit_signal:
                 ## 如果各协程都已空闲, 或是触发了stop()方法, 则停止while循环
@@ -27,10 +27,7 @@ class WorkerPool:
 
     def stop(self):
         self.exit_signal = True
-        # 只让进队列，不让出队列, 就是只把当前正在处理的页面中的链接入队列, 不再弹出任务
+        # 只让进队列, 不让出队列, 就是只把当前正在处理的页面中的链接入队列, 不再弹出任务
         ## 把协程池中的任务取出重新入队列并持久化到本地文件, 避免丢失.
         for item in self.pool:
-            self.queue.put(item.args)
-            # self.pool.killone(item)
-
-        # self.pool.kill()
+            self.queue.push(item.args)
