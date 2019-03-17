@@ -1,3 +1,5 @@
+import logging
+
 # 要爬取的网站url, 需要以http(s)开头
 main_url = 'http://97daimeng.com/'
 
@@ -40,3 +42,8 @@ max_depth = 2
 max_retry_times = 5
 
 empty_link_pattern = r'about:blank|javascript:(void\(0\))?'
+
+logging_config = {
+    'level': logging.DEBUG,
+    'format': '%(asctime)s %(levelname)s - %(name)s - %(filename)s - %(message)s',
+}
