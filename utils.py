@@ -1,7 +1,7 @@
 import os
 import re
 import hashlib
-from urllib.parse import urlparse
+from urllib.parse import urlparse, unquote
 
 import requests
 
@@ -96,6 +96,9 @@ def trans_to_local_link(url, is_page = True):
     ## 有时host中可能包含冒号, 需要转义.
     if origin_host != main_site: 
         local_path = origin_host.replace(':', special_chars[':']) + local_path
+
+    ## url中可能包含中文, 需要解码.
+    local_path = unquote(local_path)
 
     file_path = os.path.dirname(local_path)
     file_name = os.path.basename(local_path)
