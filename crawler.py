@@ -22,8 +22,6 @@ class Crawler:
         self.asset_queue = Queue()
         self.page_counter = 0
         self.asset_counter = 0
-        self._tmp_page_queue = None
-        self._tmp_asset_queue = None
 
         ## 初始化数据文件, 创建表
         self.db_conn = init_db(settings.site_db)
@@ -64,12 +62,12 @@ class Crawler:
             else:
                 parse_linking_pages(pq_selector, request_url, depth+1, callback = self.enqueue_page)
 
-            ## parse_linking_assets(pq_selector, request_url, depth+1, callback = self.enqueue_asset)
+            parse_linking_assets(pq_selector, request_url, depth+1, callback = self.enqueue_asset)
 
             ## 抓取此页面上的静态文件
-            ## self.asset_worker.start()
+            self.asset_worker.start()
             byte_content = pq_selector.outer_html().encode('utf-8')
-            file_path, file_name, _ = trans_to_local_link(request_url)
+            file_path, file_name, _ = trans_to_local_link(request_url, True)
             code, data = save_file_async(file_path, file_name, byte_content)
             if code: self.set_record_to_success(request_url)
         except Exception as err:
@@ -91,7 +89,7 @@ class Crawler:
         content = resp.content
         if 'content-type' in resp.headers and 'text/css' in resp.headers['content-type']:
             content = parse_css_file(resp.text, request_url, depth, callback = self.enqueue_asset)
-        file_path, file_name, _ = trans_to_local_link(request_url)
+        file_path, file_name, _ = trans_to_local_link(request_url, False)
         code, data = save_file_async(file_path, file_name, content)
         if code: self.set_record_to_success(request_url)
 
@@ -112,7 +110,6 @@ class Crawler:
 
     def enqueue_page(self, url, refer, depth):
         if query_url_record(self.db_conn, url): return
-
         self.page_queue.put((url, refer, depth, 0))
         add_url_record(self.db_conn, url, refer, depth)
         self.page_counter += 1
@@ -138,24 +135,32 @@ class Crawler:
         '''
         print('保存任务队列')
         page_tasks = []
-        self._tmp_page_queue = copy.copy(self.page_queue)
+        asset_tasks = []
+        _tmp_page_queue = Queue()
+        _tmp_asset_queue = Queue()
+
+        try:
+            ## 这里只能用deepcopy, 浅拷贝不行.
+            _tmp_page_queue = copy.deepcopy(self.page_queue)
+            _tmp_asset_queue = copy.deepcopy(self.asset_queue)
+        except Exception as err:
+            ## 这里会报can't pickle _thread.lock objects
+            ## 但是不影响执行流程(这个异常必须捕捉)
+            print('deepcopy异常: ', err)
+
+        ## 将队列中的成员写入数据库作为备份
         while True:
-            if not self._tmp_page_queue.empty():
-                item = self._tmp_page_queue.get()
-                page_tasks.append(tuple(item))
-            else:
-                break
+            if _tmp_page_queue.empty(): break
+            item = _tmp_page_queue.get()
+            page_tasks.append(tuple(item))
+
+        while True:
+            if _tmp_asset_queue.empty(): break
+            item = _tmp_asset_queue.get()
+            asset_tasks.append(tuple(item))
+
         if len(page_tasks) > 0:
             save_page_task(self.db_conn, page_tasks)
-
-        asset_tasks = []
-        self._tmp_asset_queue = copy.copy(self.asset_queue)
-        while True:
-            if not self._tmp_asset_queue.empty():
-                item = self._tmp_asset_queue.get()
-                asset_tasks.append(tuple(item))
-            else:
-                break
         if len(asset_tasks) > 0:
             save_asset_task(self.db_conn, asset_tasks)
         print('保存任务队列完成')
