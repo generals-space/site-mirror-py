@@ -1,11 +1,16 @@
 import os
 import re
 import hashlib
+import logging
 from urllib.parse import urlparse, unquote
 
 import requests
 
-from settings import main_url, headers, proxies, output_path
+from settings import main_url, headers, proxies, output_path, logging_config
+
+logging.basicConfig(**logging_config)
+logger = logging.getLogger(__name__)
+## logger.setLevel(logging.DEBUG)
 
 main_site = ''
 def get_main_site():
@@ -25,10 +30,10 @@ def request_get_async(url, refer):
         resp = requests.get(url=url, verify=True, headers=_headers, proxies=proxies)
         return (1, resp)
     except requests.exceptions.ConnectionError as err:
-        print('连接异常 %s : %s' % (url, err))
+        logger.error('连接异常 %s : %s' % (url, err))
         return (0, err)
     except Exception as err:
-        print('请求失败 %s: %s' % (url, err))
+        logger.error('请求失败 %s: %s' % (url, err))
         return (0, err)
 
 def save_file_async(file_path, file_name, byte_content):
@@ -45,7 +50,7 @@ def save_file_async(file_path, file_name, byte_content):
         file.close()
         return (1, None)
     except IOError as err:
-        print('save Error: ', err, 'path: ', path, 'name: ', file_name)
+        logger.error('save Error: ', err, 'path: ', path, 'name: ', file_name)
         return (0, err)
 
 special_chars = {

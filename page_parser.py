@@ -4,7 +4,7 @@ from urllib.parse import urljoin, urlparse
 from pyquery import PyQuery
 
 from settings import empty_link_pattern, outsite_asset
-from utils import get_main_site, trans_to_local_link
+from utils import logger, get_main_site, trans_to_local_link
 
 def get_page_charset(page_content):
     '''
@@ -43,7 +43,7 @@ def _parse_linking_pages(element_list, origin_url, attr_name, depth, callback = 
         full_url = urljoin(origin_url, url_attr)
         ## 站外的页面绝对不会抓取, 倒是站外的资源可以下载下来
         if urlparse(full_url).netloc != main_site:
-            ## print('不抓取站外页面: %s' % full_url )
+            logger.info('不抓取站外页面: %s' % full_url)
             continue
         _, _, local_path = trans_to_local_link(full_url, True)
         ## 重设链接地址为本地路径
@@ -76,7 +76,7 @@ def _parse_linking_assets(element_list, origin_url, attr_name, depth, callback):
         full_url = urljoin(origin_url, url_attr)
         host = urlparse(full_url).netloc
         if host != main_site and not outsite_asset: 
-            print('不抓取站外资源: %s' % full_url )
+            logger.info('不抓取站外资源: %s' % full_url)
             continue
 
         _, _, local_link = trans_to_local_link(full_url, False)

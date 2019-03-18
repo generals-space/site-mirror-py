@@ -10,7 +10,7 @@ from pyquery import PyQuery
 
 from settings import outsite_asset, doc_pool_max, res_pool_max, main_url, max_depth, max_retry_times, empty_link_pattern, site_db
 from page_parser import get_page_charset, parse_linking_pages, parse_linking_assets, parse_css_file
-from utils import request_get_async, save_file_async, trans_to_local_link
+from utils import logger, request_get_async, save_file_async, trans_to_local_link
 from worker_pool import WorkerPool
 from db import init_db, query_url_record, add_url_record, query_page_tasks, query_asset_tasks, save_page_task, save_asset_task, update_record_to_success
 from cache_queue import CacheQueue
@@ -38,14 +38,14 @@ class Crawler:
         抓取目标页面
         '''
         if 0 < max_depth and max_depth < depth: 
-            print('目标url: %s 已超过最大深度' % request_url)
+            logger.warning('目标url: %s 已超过最大深度' % request_url)
             return
         if failed_times > max_retry_times:
-            print('目标url: %s 失败次数过多' % request_url)
+            logger.warning('目标url: %s 失败次数过多, 不再重试' % request_url)
             return
         code, resp = request_get_async(request_url, refer)
         if not code:
-            ## print('请求页面失败 %s, referer %s, 重新入队列 %s' % (request_url, refer))
+            logger.error('请求页面失败 %s, referer %s, 重新入队列 %s' % (request_url, refer))
             ## 出现异常, 则失败次数加1
             ## 不需要调用enqueue(), 直接入队列.
             self.page_queue.push((request_url, refer, depth, failed_times + 1))
@@ -59,7 +59,7 @@ class Crawler:
             ## 超过最大深度的页面不再抓取, 在入队列前就先判断.
             ## 但超过静态文件无所谓深度, 所以还是要抓取的.
             if 0 < max_depth and max_depth < depth + 1:
-                print('当前页面: %s 已达到最大深度, 不再抓取新页面' % (request_url, ))
+                logger.warning('当前页面: %s 已达到最大深度, 不再抓取新页面' % (request_url, ))
             else:
                 parse_linking_pages(pq_selector, request_url, depth+1, callback = self.enqueue_page)
 
@@ -72,7 +72,7 @@ class Crawler:
             code, data = save_file_async(file_path, file_name, byte_content)
             if code: self.set_record_to_success(request_url)
         except Exception as err:
-            print('parse page failed: %s' %err)
+            logger.error('parse page failed: %s' % err)
 
     def get_static_asset(self, request_url, refer, depth, failed_times):
         '''
@@ -83,7 +83,7 @@ class Crawler:
 
         code, resp = request_get_async(request_url, refer)
         if not code:
-            ## print('请求静态资源失败 %s, 重新入队列' % (request_url, ))
+            logger.error('请求静态资源失败 %s, 重新入队列' % (request_url,))
             ## 出现异常, 则失败次数加1
             self.asset_queue.push((request_url, refer, depth, failed_times + 1))
             return
@@ -119,7 +119,7 @@ class Crawler:
             self.save_queue()
 
     def load_queue(self):
-        print('初始化任务队列')
+        logger.debug('初始化任务队列')
         page_tasks = query_page_tasks(self.db_conn)
         for task in page_tasks:
             item = (task[0], task[1], int(task[2]), int(task[3]))
@@ -128,13 +128,13 @@ class Crawler:
         for task in asset_tasks:
             item = (task[0], task[1], int(task[2]), int(task[3]))
             self.asset_queue.push(item)
-        print('初始化任务队列完成')
+        logger.debug('初始化任务队列完成')
 
     def save_queue(self):
         '''
         将队列中的任务元素存储到数据库中, 下次启动时加载, 继续执行.
         '''
-        print('保存任务队列')
+        logger.debug('保存任务队列')
         page_tasks = []
         asset_tasks = []
         _tmp_page_queue = copy.copy(self.page_queue)
@@ -155,7 +155,7 @@ class Crawler:
             save_page_task(self.db_conn, page_tasks)
         if len(asset_tasks) > 0:
             save_asset_task(self.db_conn, asset_tasks)
-        print('保存任务队列完成')
+        logger.debug('保存任务队列完成')
 
     def set_record_to_success(self, url):
         update_record_to_success(self.db_conn, url)
@@ -164,7 +164,7 @@ class Crawler:
         '''
         任务停止前存储队列以便之后继续
         '''
-        print('用户取消, 正在终止...')
+        logger.info('用户取消, 正在终止...')
         self.page_worker.stop()
         self.asset_worker.stop()
         self.save_queue()
