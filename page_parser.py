@@ -1,5 +1,5 @@
 import re
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin, urlparse, urldefrag
 
 from pyquery import PyQuery
 
@@ -41,6 +41,8 @@ def _parse_linking_pages(element_list, origin_url, attr_name, depth, callback = 
         if url_attr is None or re.search(empty_link_pattern, url_attr): continue
 
         full_url = urljoin(origin_url, url_attr)
+        ## 忽略url中的井号
+        full_url = urldefrag(full_url).url
         ## 站外的页面绝对不会抓取, 倒是站外的资源可以下载下来
         if urlparse(full_url).netloc != main_site:
             logger.info('不抓取站外页面: %s' % full_url)
@@ -74,6 +76,8 @@ def _parse_linking_assets(element_list, origin_url, attr_name, depth, callback):
             continue
 
         full_url = urljoin(origin_url, url_attr)
+        ## 忽略url中的井号
+        full_url = urldefrag(full_url).url
         host = urlparse(full_url).netloc
         if host != main_site and not outsite_asset: 
             logger.info('不抓取站外资源: %s' % full_url)
