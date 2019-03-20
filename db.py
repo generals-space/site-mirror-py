@@ -11,9 +11,10 @@ def init_db(db_file):
     sql_str = '''
     create table if not exists url_records(
         id integer primary key autoincrement, 
-        url varchar(512) unique, -- '已抓取过的url(可以是页面, 可以是静态资源), 唯一, 作为索引键'
+        url varchar(512) unique, -- 已抓取过的url(可以是页面, 可以是静态资源), 唯一, 作为索引键
         refer varchar(512),
         depth int, 
+        url_type varchar(50),        -- page, asset两种类型
         success int default 0
     )
     '''
@@ -60,13 +61,13 @@ def query_url_record(db_conn, url):
     cursor.close()
     return row
 
-def add_url_record(db_conn, url, refer, depth):
+def add_url_record(db_conn, url, refer, depth, url_type):
     '''
     return: 返回新插入行的id
     '''
-    sql_str = 'insert into url_records(url, refer, depth) values(?, ?, ?)'
+    sql_str = 'insert into url_records(url, refer, depth, url_type) values(?, ?, ?, ?)'
     cursor = db_conn.cursor()
-    cursor.execute(sql_str, (url, refer, depth, ))
+    cursor.execute(sql_str, (url, refer, depth, url_type, ))
     ## 获取新插入数据id的方法
     last_id = cursor.lastrowid
     ## 默认关闭自动提交

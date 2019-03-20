@@ -112,7 +112,7 @@ class Crawler:
         if query_url_record(self.db_conn, url): return
 
         self.asset_queue.push((url, refer, depth, 0))
-        add_url_record(self.db_conn, url, refer, depth)
+        add_url_record(self.db_conn, url, refer, depth, 'asset')
         self.asset_counter += 1
         if self.asset_counter >= 50: 
             self.asset_counter = 0
@@ -121,7 +121,7 @@ class Crawler:
     def enqueue_page(self, url, refer, depth):
         if query_url_record(self.db_conn, url): return
         self.page_queue.push((url, refer, depth, 0))
-        add_url_record(self.db_conn, url, refer, depth)
+        add_url_record(self.db_conn, url, refer, depth, 'page')
         self.page_counter += 1
         if self.page_counter >= 50: 
             self.page_counter = 0
