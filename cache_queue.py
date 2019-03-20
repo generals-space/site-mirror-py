@@ -1,6 +1,10 @@
-import json
-
 class CacheQueue(list):
+    '''
+    为了避免数据丢失, 需要定时将队列中的数据持久化到数据库.
+    但是原生队列无法使用copy/deepcopy拷贝, 会报
+    为了保证取出数据的同时不丢失数据, 需要先get再put回去, 太傻了.
+    这里用list模拟简单队列.
+    '''
     def __init__(self):
         super(CacheQueue, self).__init__()
         self.is_lock = False
