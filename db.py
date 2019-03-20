@@ -10,7 +10,7 @@ def init_db(db_file):
     ## url_records: 已抓取页面记录
     sql_str = '''
     create table if not exists url_records(
-        id bigint primary key, 
+        id integer primary key autoincrement, 
         url varchar(512) unique, -- '已抓取过的url(可以是页面, 可以是静态资源), 唯一, 作为索引键'
         refer varchar(512),
         depth int, 
@@ -26,7 +26,7 @@ def init_db(db_file):
     ## url_records: 页面抓取任务队列备份
     sql_str = '''
     create table if not exists page_tasks(
-        id bigint primary key, 
+        id integer primary key autoincrement, 
         url varchar(512) unique, -- '已抓取过的url(可以是页面, 可以是静态资源), 唯一, 作为索引键'
         refer varchar(512), 
         depth int, 
@@ -39,7 +39,7 @@ def init_db(db_file):
     ## url_records: 静态资源抓取任务队列备份
     sql_str = '''
     create table if not exists asset_tasks(
-        id bigint primary key, 
+        id integer primary key autoincrement, 
         url varchar(512) unique, -- '已抓取过的url(可以是页面, 可以是静态资源), 唯一, 作为索引键'
         refer varchar(512), 
         depth int,
