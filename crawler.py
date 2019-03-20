@@ -27,16 +27,19 @@ class Crawler:
         self.load_queue()
         self.enqueue_page(main_url, '', 1)
 
-        self.page_worker = WorkerPool(self.page_queue, self.get_html_page, doc_pool_max)
-        self.asset_worker = WorkerPool(self.asset_queue, self.get_static_asset, res_pool_max)
+        self.page_worker_pool = WorkerPool(self.page_queue, self.get_html_page, doc_pool_max, worker_type = 'page')
+        self.asset_worker_pool = WorkerPool(self.asset_queue, self.get_static_asset, res_pool_max, worker_type = 'asset')
 
     def start(self):
-        self.page_worker.start()
+        self.page_worker_pool.start()
+        logger.info('page worker pool complete')
 
     def get_html_page(self, request_url, refer, depth, failed_times):
         '''
         抓取目标页面
         '''
+        msg = 'get_static_asset: request_url %s, refer %s, depth %d, failed_times %d' % (request_url, refer, depth, failed_times)
+        logger.debug(msg)
         if 0 < max_depth and max_depth < depth: 
             logger.warning('目标url: %s 已超过最大深度' % request_url)
             return
@@ -66,18 +69,20 @@ class Crawler:
             parse_linking_assets(pq_selector, request_url, depth+1, callback = self.enqueue_asset)
 
             ## 抓取此页面上的静态文件
-            self.asset_worker.start()
+            self.asset_worker_pool.start(page_url=request_url)
             byte_content = pq_selector.outer_html().encode('utf-8')
             file_path, file_name, _ = trans_to_local_link(request_url, True)
             code, data = save_file_async(file_path, file_name, byte_content)
             if code: self.set_record_to_success(request_url)
         except Exception as err:
-            logger.error('parse page failed: %s' % err)
+            logger.error('parse page failed for %s refer %s: %s' % (request_url, refer, err))
 
     def get_static_asset(self, request_url, refer, depth, failed_times):
         '''
         请求静态文件, css/js/img等并存储.
         '''
+        msg = 'get_static_asset: request_url %s, refer %s, depth %d, failed_times %d' % (request_url, refer, depth, failed_times)
+        logger.debug(msg)
         ## 如果该链接已经超过了最大尝试次数, 则放弃
         if failed_times > max_retry_times: return
 
@@ -87,12 +92,16 @@ class Crawler:
             ## 出现异常, 则失败次数加1
             self.asset_queue.push((request_url, refer, depth, failed_times + 1))
             return
-        content = resp.content
-        if 'content-type' in resp.headers and 'text/css' in resp.headers['content-type']:
-            content = parse_css_file(resp.text, request_url, depth, callback = self.enqueue_asset)
-        file_path, file_name, _ = trans_to_local_link(request_url, False)
-        code, data = save_file_async(file_path, file_name, content)
-        if code: self.set_record_to_success(request_url)
+    
+        try:
+            content = resp.content
+            if 'content-type' in resp.headers and 'text/css' in resp.headers['content-type']:
+                content = parse_css_file(resp.text, request_url, depth, callback = self.enqueue_asset)
+            file_path, file_name, _ = trans_to_local_link(request_url, False)
+            code, data = save_file_async(file_path, file_name, content)
+            if code: self.set_record_to_success(request_url)
+        except Exception as err:
+            logger.error('parse static asset failed for %s in page %s: %s', (request_url, refer, err))
 
     def enqueue_asset(self, url, refer, depth):
         '''
@@ -165,7 +174,7 @@ class Crawler:
         任务停止前存储队列以便之后继续
         '''
         logger.info('用户取消, 正在终止...')
-        self.page_worker.stop()
-        self.asset_worker.stop()
+        self.page_worker_pool.stop()
+        self.asset_worker_pool.stop()
         self.save_queue()
         self.db_conn.close()
