@@ -10,7 +10,7 @@ from pyquery import PyQuery
 
 from settings import outsite_asset, doc_pool_max, res_pool_max, main_url, max_depth, max_retry_times, empty_link_pattern, site_db
 from page_parser import get_page_charset, parse_linking_pages, parse_linking_assets, parse_css_file
-from utils import logger, request_get_async, save_file_async, trans_to_local_link
+from utils import logger, request_get_async, save_file_async, trans_to_local_link, trans_to_local_path
 from worker_pool import WorkerPool
 from db import init_db, query_url_record, add_url_record, query_page_tasks, query_asset_tasks, save_page_task, save_asset_task, update_record_to_success
 from cache_queue import CacheQueue
@@ -48,7 +48,7 @@ class Crawler:
             return
         code, resp = request_get_async(request_url, refer)
         if not code:
-            logger.error('请求页面失败 %s, referer %s, 重新入队列 %s' % (request_url, refer))
+            logger.error('请求页面失败 %s, referer %s, 重新入队列 %s' % (request_url, refer, resp))
             ## 出现异常, 则失败次数加1
             ## 不需要调用enqueue(), 直接入队列.
             self.page_queue.push((request_url, refer, depth, failed_times + 1))
@@ -71,7 +71,7 @@ class Crawler:
             ## 抓取此页面上的静态文件
             self.asset_worker_pool.start(page_url=request_url)
             byte_content = pq_selector.outer_html().encode('utf-8')
-            file_path, file_name, _ = trans_to_local_link(request_url, True)
+            file_path, file_name = trans_to_local_path(request_url, True)
             code, data = save_file_async(file_path, file_name, byte_content)
             if code: self.set_record_to_success(request_url)
         except Exception as err:
@@ -97,11 +97,11 @@ class Crawler:
             content = resp.content
             if 'content-type' in resp.headers and 'text/css' in resp.headers['content-type']:
                 content = parse_css_file(resp.text, request_url, depth, callback = self.enqueue_asset)
-            file_path, file_name, _ = trans_to_local_link(request_url, False)
+            file_path, file_name = trans_to_local_path(request_url, False)
             code, data = save_file_async(file_path, file_name, content)
             if code: self.set_record_to_success(request_url)
         except Exception as err:
-            logger.error('parse static asset failed for %s in page %s: %s', (request_url, refer, err))
+            logger.error('parse static asset failed for %s in page %s: %s' % (request_url, refer, err))
 
     def enqueue_asset(self, url, refer, depth):
         '''

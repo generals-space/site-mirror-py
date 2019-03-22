@@ -50,7 +50,7 @@ def save_file_async(file_path, file_name, byte_content):
         file.close()
         return (1, None)
     except IOError as err:
-        logger.error('save Error: ', err, 'path: ', path, 'name: ', file_name)
+        logger.error('Save Error: %s, path: %s, name: %s' % (err, path, file_name))
         return (0, err)
 
 special_chars = {
@@ -70,8 +70,6 @@ def trans_to_local_link(url, is_page = True):
         url: 待处理的url, 有时url为动态链接, 包含&, ?等特殊字符, 这种情况下需要对其进行编码.
         is_page: 是否为页面, 包含.php, .asp等动态页面, 区别于常规静态文件. 我们需要根据这个参数判断是否需要对其加上.html后缀.
     @return
-        file_path: 目标文件的存储目录, 相对路径(不以/开头), 为""时, 表示当前目录
-        file_name: 目标文件名称
         local_path: 本地文件存储路径, 用于写入本地html文档中的link/script/img/a等标签的链接属性
     '''
     ## 对于域名为host的url, 资源存放目录为output根目录, 而不是域名文件夹. 默认不设置主host
@@ -105,8 +103,20 @@ def trans_to_local_link(url, is_page = True):
     ## url中可能包含中文, 需要解码.
     local_path = unquote(local_path)
 
-    file_path = os.path.dirname(local_path)
-    file_name = os.path.basename(local_path)
-
     if origin_host != main_site: local_path = '/' + local_path
-    return file_path, file_name, local_path
+    return local_path
+
+def trans_to_local_path(url, is_page = True):
+    '''
+    @return
+        file_path: 目标文件的存储目录, 相对路径(不以/开头), 为""时, 表示当前目录
+        file_name: 目标文件名称
+    '''
+    local_link = trans_to_local_link(url, is_page)
+    ## 如果是站外资源, local_link可能为/www.xxx.com/static/x.jpg, 
+    ## 但我们需要的存储目录是相对路径, 所以需要事先将
+    if local_link.startswith('/'): local_link = local_link[1:]
+    file_dir = os.path.dirname(local_link)
+    file_name = os.path.basename(local_link)
+
+    return file_dir, file_name

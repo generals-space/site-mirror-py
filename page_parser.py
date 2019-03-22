@@ -47,9 +47,9 @@ def _parse_linking_pages(element_list, origin_url, attr_name, depth, callback = 
         if urlparse(full_url).netloc != main_site:
             logger.info('不抓取站外页面: %s' % full_url)
             continue
-        _, _, local_path = trans_to_local_link(full_url, True)
+        local_link = trans_to_local_link(full_url, True)
         ## 重设链接地址为本地路径
-        PyQuery(li).attr(attr_name, local_path)
+        PyQuery(li).attr(attr_name, local_link)
         if callback: callback(full_url, origin_url, depth)
 
 def parse_linking_assets(pq_selector, page_url, depth, callback = None): 
@@ -83,7 +83,7 @@ def _parse_linking_assets(element_list, origin_url, attr_name, depth, callback):
             logger.info('不抓取站外资源: %s' % full_url)
             continue
 
-        _, _, local_link = trans_to_local_link(full_url, False)
+        local_link = trans_to_local_link(full_url, False)
         ## 重设链接地址为本地路径
         PyQuery(li).attr(attr_name, local_link)
         ## 尝试入队列
@@ -111,8 +111,8 @@ def parse_css_file(content, origin_url, depth, callback = None):
                 continue
 
             full_url = urljoin(origin_url, match_url)
-            _, _, local_path = trans_to_local_link(full_url, False)
+            local_link = trans_to_local_link(full_url, False)
             ## 尝试入队列
             if callback: callback(full_url, origin_url, depth)
-            content = content.replace(match_url, local_path)
+            content = content.replace(match_url, local_link)
     return content.encode('utf-8')
