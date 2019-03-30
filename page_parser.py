@@ -3,8 +3,8 @@ from urllib.parse import urljoin, urlparse, urldefrag
 
 from pyquery import PyQuery
 
-from settings import empty_link_pattern, outsite_asset
-from utils import logger, get_main_site, trans_to_local_link
+from settings import outsite_asset
+from utils import logger, empty_link_pattern, get_main_site, trans_to_local_link, url_filter
 
 def get_page_charset(page_content):
     '''
@@ -40,15 +40,14 @@ def _parse_linking_pages(element_list, origin_url, attr_name, depth, callback = 
         url_attr = PyQuery(li).attr(attr_name)
         if url_attr is None or re.search(empty_link_pattern, url_attr): continue
 
+        ## 拼接url并忽略url中的井号
         full_url = urljoin(origin_url, url_attr)
-        ## 忽略url中的井号
         full_url = urldefrag(full_url).url
-        ## 站外的页面绝对不会抓取, 倒是站外的资源可以下载下来
-        if urlparse(full_url).netloc != main_site:
-            logger.info('不抓取站外页面: %s' % full_url)
-            continue
-        local_link = trans_to_local_link(full_url, True)
+        ## 如果不满足过滤规则则跳过
+        if not url_filter(full_url, url_type='page'): continue
+
         ## 重设链接地址为本地路径
+        local_link = trans_to_local_link(full_url, True)
         PyQuery(li).attr(attr_name, local_link)
         if callback: callback(full_url, origin_url, depth)
 
@@ -75,18 +74,15 @@ def _parse_linking_assets(element_list, origin_url, attr_name, depth, callback):
         if url_attr is None or re.search(empty_link_pattern, url_attr): 
             continue
 
+        ## 拼接url并忽略url中的井号
         full_url = urljoin(origin_url, url_attr)
-        ## 忽略url中的井号
         full_url = urldefrag(full_url).url
-        host = urlparse(full_url).netloc
-        if host != main_site and not outsite_asset: 
-            logger.info('不抓取站外资源: %s' % full_url)
-            continue
+        ## 如果不满足过滤规则则跳过
+        if not url_filter(full_url, url_type='asset'): continue
 
-        local_link = trans_to_local_link(full_url, False)
         ## 重设链接地址为本地路径
+        local_link = trans_to_local_link(full_url, False)
         PyQuery(li).attr(attr_name, local_link)
-        ## 尝试入队列
         if callback: callback(full_url, origin_url, depth)
 
 def parse_css_file(content, origin_url, depth, callback = None):
@@ -111,8 +107,10 @@ def parse_css_file(content, origin_url, depth, callback = None):
                 continue
 
             full_url = urljoin(origin_url, match_url)
+            ## 如果不满足过滤规则则跳过
+            if not url_filter(full_url, url_type='asset'): continue
             local_link = trans_to_local_link(full_url, False)
-            ## 尝试入队列
+
             if callback: callback(full_url, origin_url, depth)
             content = content.replace(match_url, local_link)
     return content.encode('utf-8')
