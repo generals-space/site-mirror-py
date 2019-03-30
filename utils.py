@@ -6,11 +6,28 @@ from urllib.parse import urlparse, unquote
 
 import requests
 
-from settings import main_url, headers, proxies, output_path, logging_config
+from settings import main_url, headers, proxies, output_path, logging_config, outsite_asset
+from settings import no_js, no_css, no_images, no_fonts, black_list
 
 logging.basicConfig(**logging_config)
 logger = logging.getLogger(__name__)
 ## logger.setLevel(logging.DEBUG)
+
+empty_link_pattern = r'about:blank|javascript:(void\(0\))?'
+
+special_chars = {
+    '\\': 'xg',
+    ':': 'mh',
+    '*': 'xh',
+    '?': 'wh',
+    '<': 'xy',
+    '>': 'dy',
+    '|': 'sx',
+    ' ': 'kg'
+}
+
+image_pattern = '\.((jpg)|(png)|(bmp)|(jpeg)|(gif)|(webp))$'
+font_pattern = '\.((ttf)|(woff)|(woff2)|(otf)|(eot))$'
 
 main_site = ''
 def get_main_site():
@@ -52,17 +69,6 @@ def save_file_async(file_path, file_name, byte_content):
     except IOError as err:
         logger.error('Save Error: %s, path: %s, name: %s' % (err, path, file_name))
         return (0, err)
-
-special_chars = {
-    '\\': 'xg',
-    ':': 'mh',
-    '*': 'xh',
-    '?': 'wh',
-    '<': 'xy',
-    '>': 'dy',
-    '|': 'sx',
-    ' ': 'kg'
-}
 
 def trans_to_local_link(url, is_page = True):
     '''
@@ -120,3 +126,46 @@ def trans_to_local_path(url, is_page = True):
     file_name = os.path.basename(local_link)
 
     return file_dir, file_name
+
+def url_filter(url, url_type = 'page'):
+    '''
+    @function 这个函数对url比对所有设置的规则, 判断目标url是否可以抓取.
+    @param: url_type url类型: page/asset
+    @return: True: 可以抓取, False: 不可以抓取
+    '''
+    main_site = get_main_site()
+    ## 站外的页面绝对不会抓取, 倒是站外的资源可以下载下来
+    if url_type == 'page' and urlparse(url).netloc != main_site:
+        logger.info('不抓取站外页面: %s' % url)
+        return False
+
+    urlObj = urlparse(url)
+    host = urlObj.netloc
+    if url_type == 'asset' and host != main_site and not outsite_asset:
+        logger.info('不抓取站外资源: %s' % url)
+        return False
+
+    path = urlObj.path
+    if url_type == 'asset' and path.endswith('.js') and no_js:
+        logger.info('不抓取js资源: %s' % url)
+        return False
+
+    if url_type == 'asset' and path.endswith('.css') and no_css:
+        logger.info('不抓取css资源: %s' % url)
+        return False
+
+    if url_type == 'asset' and re.search(image_pattern, url) and no_images:
+        logger.info('不抓取图片资源: %s' % url)
+        return False
+
+    if url_type == 'asset' and re.search(font_pattern, url) and no_fonts:
+        logger.info('不抓取字体资源: %s' % url)
+        return False
+
+    ## 不抓取黑名单中的url
+    for pattern in black_list:
+        if re.search(pattern, url):
+            logger.info('不抓取黑名单中的url: %s' % url)
+            return False
+
+    return True

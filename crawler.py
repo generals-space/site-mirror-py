@@ -8,9 +8,9 @@ from urllib.parse import urlparse, urljoin
 
 from pyquery import PyQuery
 
-from settings import outsite_asset, doc_pool_max, res_pool_max, main_url, max_depth, max_retry_times, empty_link_pattern, site_db
+from settings import outsite_asset, doc_pool_max, res_pool_max, main_url, max_depth, max_retry_times, site_db
 from page_parser import get_page_charset, parse_linking_pages, parse_linking_assets, parse_css_file
-from utils import logger, request_get_async, save_file_async, trans_to_local_link, trans_to_local_path
+from utils import logger, empty_link_pattern, request_get_async, save_file_async, trans_to_local_link, trans_to_local_path
 from worker_pool import WorkerPool
 from db import init_db, query_url_record, add_url_record, query_page_tasks, query_asset_tasks, save_page_task, save_asset_task, update_record_to_success
 from cache_queue import CacheQueue
