@@ -87,7 +87,7 @@ def trans_to_local_link(url, is_page = True):
     origin_query = urlObj.query
 
     local_path = origin_path
-    # url除去最后的/
+    if local_path == "": local_path = 'index.html'
     if local_path.endswith('/'): local_path += 'index.html'
 
     if origin_query != '': 
@@ -99,17 +99,15 @@ def trans_to_local_link(url, is_page = True):
     if is_page and not local_path.endswith('.html') and not local_path.endswith('.htm'):
         local_path += '.html'
 
-    ## 如果该url就是这个站点域名下的，那么无需新建域名目录存放
+    ## 如果该url就是当前站点域名下的，那么无需新建域名目录存放.
     ## 如果是其他站点的(需要事先开启允许下载其他站点的配置), 
     ## 则要将资源存放在以站点域名为名的目录下, 路径中仍然需要保留域名部分.
     ## 有时host中可能包含冒号, 需要转义.
     if origin_host != main_site: 
-        local_path = origin_host.replace(':', special_chars[':']) + local_path
+        local_path = '/' + origin_host.replace(':', special_chars[':']) + local_path
 
     ## url中可能包含中文, 需要解码.
     local_path = unquote(local_path)
-
-    if origin_host != main_site: local_path = '/' + local_path
     return local_path
 
 def trans_to_local_path(url, is_page = True):
@@ -120,7 +118,7 @@ def trans_to_local_path(url, is_page = True):
     '''
     local_link = trans_to_local_link(url, is_page)
     ## 如果是站外资源, local_link可能为/www.xxx.com/static/x.jpg, 
-    ## 但我们需要的存储目录是相对路径, 所以需要事先将
+    ## 但我们需要的存储目录是相对路径, 所以需要事先将链接起始的/移除
     if local_link.startswith('/'): local_link = local_link[1:]
     file_dir = os.path.dirname(local_link)
     file_name = os.path.basename(local_link)

@@ -1,7 +1,8 @@
 class CacheQueue(list):
     '''
     为了避免数据丢失, 需要定时将队列中的数据持久化到数据库.
-    但是原生队列无法使用copy/deepcopy拷贝, 会报
+    但是原生队列无法使用copy/deepcopy拷贝, 会报TypeError: can't pickle _thread.lock objects.
+    就算使用pickle模块也是这个问题, 无法实例化.
     为了保证取出数据的同时不丢失数据, 需要先get再put回去, 太傻了.
     这里用list模拟简单队列.
     '''
