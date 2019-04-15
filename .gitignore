@@ -1,4 +1,4 @@
-output/
+sites/
 logs/
 *.pyc
 .idea

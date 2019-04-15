@@ -14,8 +14,8 @@ def init_db(db_file):
         url varchar(512) unique, -- 已抓取过的url(可以是页面, 可以是静态资源), 唯一, 作为索引键
         refer varchar(512),
         depth int, 
-        url_type varchar(50),        -- page, asset两种类型
-        success int default 0
+        url_type varchar(50),        -- page, asset 2种类型
+        status varchar(50) default 'init' -- init, success, failed 3种类型
     )
     '''
     cursor.execute(sql_str)
@@ -28,7 +28,7 @@ def init_db(db_file):
     sql_str = '''
     create table if not exists page_tasks(
         id integer primary key autoincrement, 
-        url varchar(512) unique, -- '已抓取过的url(可以是页面, 可以是静态资源), 唯一, 作为索引键'
+        url varchar(512) unique, -- 已抓取过的url(可以是页面, 可以是静态资源), 唯一, 作为索引键
         refer varchar(512), 
         depth int, 
         failed_times int
@@ -41,7 +41,7 @@ def init_db(db_file):
     sql_str = '''
     create table if not exists asset_tasks(
         id integer primary key autoincrement, 
-        url varchar(512) unique, -- '已抓取过的url(可以是页面, 可以是静态资源), 唯一, 作为索引键'
+        url varchar(512) unique, -- 已抓取过的url(可以是页面, 可以是静态资源), 唯一, 作为索引键
         refer varchar(512), 
         depth int,
         failed_times int
@@ -61,13 +61,13 @@ def query_url_record(db_conn, url):
     cursor.close()
     return row
 
-def add_url_record(db_conn, url, refer, depth, url_type):
+def add_url_record(db_conn, task):
     '''
     return: 返回新插入行的id
     '''
     sql_str = 'insert into url_records(url, refer, depth, url_type) values(?, ?, ?, ?)'
     cursor = db_conn.cursor()
-    cursor.execute(sql_str, (url, refer, depth, url_type, ))
+    cursor.execute(sql_str, (task['url'], task['refer'], task['depth'], task['url_type'], ))
     ## 获取新插入数据id的方法
     last_id = cursor.lastrowid
     ## 默认关闭自动提交
@@ -89,11 +89,15 @@ def query_page_tasks(db_conn):
 def query_asset_tasks(db_conn):
     return query_tasks(db_conn, 'asset_tasks')
 
-def update_record_to_success(db_conn, url):
-    sql_str = 'update url_records set success = 1 where url = ?'
+def update_record_status(db_conn, url, status):
+    '''
+    @param: url 目标记录url
+    @param: status 目标记录状态, 字符串. 可选值为: init, success, failed
+    '''
+    sql_str = 'update url_records set status = ? where url = ?'
     cursor = db_conn.cursor()
     ## 单个元素的写法, 注意如果是元组形式, 必须为逗号结尾.
-    cursor.execute(sql_str, (url,))
+    cursor.execute(sql_str, (status, url,))
     db_conn.commit()
     cursor.close()
 

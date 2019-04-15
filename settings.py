@@ -1,7 +1,7 @@
 import logging
 
 # 要爬取的网站url, 需要以http(s)开头
-main_url = 'https://m.heiyeba.com'
+main_url = 'https://m.xieeda.com/'
 
 # 设置代理
 # 代理格式:
@@ -17,7 +17,7 @@ headers = {
 }
 
 # 输出站点文件的路径，最后要加 '/'
-output_path = './output/'
+site_path = './sites/'
 
 site_db = 'site.db'
 # 每次请求的最大超时时间
@@ -34,7 +34,7 @@ wait_time = [1, 3]
 
 # 爬取页面的深度, 从1开始计, 爬到第N层为止.
 # 1表示只抓取单页, 0表示无限制
-max_depth = 2
+max_depth = 1
 # 请求出错最大重试次数（超时也算出错）
 max_retry_times = 5
 
@@ -49,7 +49,7 @@ logging_config = {
 outsite_asset = True
 no_js = True
 no_css = False
-no_images = True
+no_images = False
 no_fonts = False
 ## 黑名单, 列表类型. 规则格式为正则, 默认为空.
 black_list = []

@@ -7,4 +7,4 @@ services:
       - 8080:80
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/main.conf
-      - ./output:/usr/share/nginx/html
+      - ./sites:/usr/share/nginx/html
