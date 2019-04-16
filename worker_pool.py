@@ -7,7 +7,7 @@ from gevent.pool import Pool
 from utils import logger
 
 class WorkerPool:
-    def __init__(self, queue, func = None, pool_max=100, worker_type = 'page'):
+    def __init__(self, queue, func = None, pool_max = 100, worker_type = 'page'):
         self.queue = queue
         self.worker = func
         self.exit_signal = False
@@ -16,30 +16,35 @@ class WorkerPool:
         self.pool = Pool(pool_max)
         self.worker_type = worker_type
 
-    def start(self, page_url = ''):
-        if self.worker_type == 'asset' and page_url != '':
-            logger.debug('asset worker pool start for page: %s' % page_url)
+    def start(self, page_task = None):
+        if self.worker_type == 'asset':
+            msg = '静态资源工作池启动, 所属页面: {:s}'
+            logger.debug(msg.format(page_task['refer']))
 
         while True:
             if self.exit_signal: break
             if not self.queue.empty():
-                item = self.queue.pop()
-                logger.debug('从队列中取出成员: %s, 调用worker' % str(item))
-                self.pool.spawn(self.worker, *item)
+                task = self.queue.pop()
+                msg = '从队列中取出成员, 调用worker. task: {task:s}'
+                logger.debug(msg.format(task = str(task)))
+                self.pool.spawn(self.worker, task)
             elif self.pool.free_count() != self.pool.size:
                 ## 如果队列已空, 但是协程池还未全部空闲, 说明仍有任务在执行, 等待.
                 free = self.pool.free_count()
                 total = self.pool.size
                 working = total - free
-                logger.debug('pool worker usage: %d/%d, page url: %s' % (working, total, page_url))
+                if self.worker_type == 'asset':
+                    msg = '工作池使用率: {working:d}/{total:d}, page_task: {page_task:s}'
+                    logger.debug(msg.format(working = working, total = total, page_task = str(page_task)))
                 sleep(1)
             elif self.exit_signal:
                 ## 如果队列为空, 且各协程都已空闲, 或是触发了stop()方法, 则停止while循环
                 break
             else: 
                 break
-        if self.worker_type == 'asset' and page_url != '':
-            logger.debug('asset worker pool stop for page: %s' % page_url)
+        if self.worker_type == 'asset':
+            msg = '静态资源工作池结束, 所属页面: {:s}'
+            logger.debug(msg.format(page_task['refer']))
 
     def stop(self):
         self.exit_signal = True
