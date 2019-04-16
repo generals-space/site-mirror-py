@@ -1,7 +1,7 @@
 import os
 from urllib.parse import urlparse, unquote
 
-from utils import get_main_site, special_chars
+from utils import special_chars
 
 def trans_to_local_link_for_page(urlObj):
     origin_path = urlObj.path
@@ -33,7 +33,7 @@ def trans_to_local_link_for_asset(urlObj):
         local_link = local_link + special_chars['?'] + query_str
     return local_link
 
-def trans_to_local_link(url, url_type = 'page'):
+def trans_to_local_link(url, url_type, main_site):
     '''
     @param
         url: 待处理的url, 有时url为动态链接, 包含&, ?等特殊字符, 这种情况下需要对其进行编码.
@@ -42,7 +42,6 @@ def trans_to_local_link(url, url_type = 'page'):
         local_link: 本地文件存储路径, 用于写入本地html文档中的link/script/img/a等标签的链接属性
     '''
     ## 对于域名为host的url, 资源存放目录为output根目录, 而不是域名文件夹. 默认不设置主host
-    main_site = get_main_site()
 
     urlObj = urlparse(url)
     origin_host = urlObj.netloc
@@ -63,13 +62,13 @@ def trans_to_local_link(url, url_type = 'page'):
     local_link = unquote(local_link)
     return local_link
 
-def trans_to_local_path(url, url_type = 'page'):
+def trans_to_local_path(url, url_type, main_site):
     '''
     @return
         file_path: 目标文件的存储目录, 相对路径(不以/开头), 为""时, 表示当前目录
         file_name: 目标文件名称
     '''
-    local_link = trans_to_local_link(url, url_type)
+    local_link = trans_to_local_link(url, url_type, main_site)
     ## 如果是站外资源, local_link可能为/www.xxx.com/static/x.jpg, 
     ## 但我们需要的存储目录是相对路径, 所以需要事先将链接起始的/移除
     if local_link.startswith('/'): local_link = local_link[1:]
