@@ -76,7 +76,8 @@ def add_url_record(db_conn, task):
     return last_id
 
 def query_tasks(db_conn, table_name):
-    sql_str = 'select url, refer, depth, failed_times from %s' % table_name
+    sql_str = 'select url, refer, depth, failed_times from {:s}'
+    sql_str = sql_str.format(table_name)
     cursor = db_conn.cursor()
     cursor.execute(sql_str)
     rows = cursor.fetchall()
@@ -102,11 +103,14 @@ def update_record_status(db_conn, url, status):
     cursor.close()
 
 def save_task(db_conn, table_name, value_list):
-    sql_str = 'delete from %s' % table_name
+    sql_str = 'delete from {:s}'.format(table_name)
     cursor = db_conn.cursor()
     cursor.execute(sql_str)
-    sql_str = 'insert into %s(url, refer, depth, failed_times) values(?, ?, ?, ?)' % table_name
+
+    sql_str = 'insert into {:s} (url, refer, depth, failed_times) values(?, ?, ?, ?)'
+    sql_str = sql_str.format(table_name)
     cursor.executemany(sql_str, value_list)
+    
     db_conn.commit()
     cursor.close()
 

@@ -1,19 +1,21 @@
 '''
 gevent类型的协程工作池, 以while循环不断执行指定的worker方法
 '''
+import logging
+
 from gevent import sleep
 from gevent.pool import Pool
 
-from utils import logger
+logger = logging.getLogger(__name__)
 
 class WorkerPool:
-    def __init__(self, queue, func = None, pool_max = 100, worker_type = 'page'):
+    def __init__(self, queue, func = None, pool_size = 100, worker_type = 'page'):
         self.queue = queue
         self.worker = func
         self.exit_signal = False
-        self.pool_max = pool_max
+        self.pool_size = pool_size
         ## Pool类基于gevent.pool.Group类
-        self.pool = Pool(pool_max)
+        self.pool = Pool(pool_size)
         self.worker_type = worker_type
 
     def start(self, page_task = None):
