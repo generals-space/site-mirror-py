@@ -26,7 +26,7 @@ class WorkerPool:
         while True:
             if self.exit_signal: break
             if not self.queue.empty():
-                task = self.queue.pop()
+                task = self.queue.get()
                 msg = '从队列中取出成员, 调用worker. task: {task:s}'
                 logger.debug(msg.format(task = str(task)))
                 self.pool.spawn(self.worker, task)
@@ -53,4 +53,4 @@ class WorkerPool:
         # 只让进队列, 不让出队列, 就是只把当前正在处理的页面中的链接入队列, 不再弹出任务
         ## 把协程池中的任务取出重新入队列并持久化到本地文件, 避免丢失.
         for item in self.pool:
-            self.queue.push(item.args)
+            self.queue.put(item.args)

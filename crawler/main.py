@@ -5,6 +5,7 @@ import time
 import sqlite3
 import copy
 import logging
+from queue import Queue
 from urllib.parse import urlparse, urljoin
 
 from pyquery import PyQuery
@@ -12,25 +13,24 @@ from pyquery import PyQuery
 from crawler.page_parser import get_page_charset, parse_linking_pages, parse_linking_assets, parse_css_file
 from crawler.utils import empty_link_pattern, request_get_async, save_file_async
 from crawler.transform import trans_to_local_path
-from worker.worker_pool import WorkerPool
-from worker.cache_queue import CacheQueue
-from model.db import init_db
-from model.url_record import query_url_record, add_url_record
-from model.task import query_page_tasks, query_asset_tasks, save_page_task, save_asset_task, update_record_status
+from crawler.worker_pool import WorkerPool
+from crawler.db import init_db, query_unfinished_page_tasks, query_unfinished_asset_tasks, query_url_record, add_url_record, update_record_status
 
 logger = logging.getLogger(__name__)
 
 class Crawler:
     def __init__(self, config):
-        self.page_queue = CacheQueue()
-        self.asset_queue = CacheQueue()
-        self.page_counter = 0
-        self.asset_counter = 0
+        ## 队列满时put会使整个进程阻塞无法继续执行, 之后要改成异步形式
+        ## self.page_queue = Queue(maxsize = config['page_queue_size'])
+        ## self.asset_queue = Queue(maxsize = config['asset_queue_size'])
+        self.page_queue = Queue(maxsize = config['page_queue_size'])
+        self.asset_queue = Queue(maxsize = config['asset_queue_size'])
+
         self.config = config
 
         self.main_site = urlparse(self.config['main_url']).netloc
 
-        ## 初始化数据文件, 创建表
+        ## 初始化数据文件, 创建表.
         self.db_conn = init_db(self.config['site_db'])
         self.load_queue()
         main_task = {
@@ -63,8 +63,11 @@ class Crawler:
         '''
         抓取目标页面
         '''
-        msg = 'get_static_asset(): task: {task:s}'
+        msg = 'get_html_page(): task: {task:s}'
         logger.debug(msg.format(task = str(task)))
+        ## 更新记录状态
+        update_record_status(self.db_conn, task['url'], 'pending')
+
         if 0 < self.config['max_depth'] < task['depth']: 
             msg = '已超过最大深度: task: {task:s}'
             logger.warning(msg.format(task = str(task)))
@@ -72,7 +75,9 @@ class Crawler:
         if task['failed_times'] > self.config['max_retry_times']:
             msg = '失败次数过多, 不再重试: task: {task:s}'
             logger.warning(msg.format(task = str(task)))
+            update_record_status(self.db_conn, task['url'], 'failed')
             return
+
         code, resp = request_get_async(task, self.config)
         if not code:
             msg = '请求页面失败, 重新入队列: task: {task:s}, err: {err:s}'
@@ -80,17 +85,19 @@ class Crawler:
             ## 出现异常, 则失败次数加1
             ## 不需要调用enqueue(), 直接入队列.
             task['failed_times'] += 1
-            self.page_queue.push(task)
+            self.page_queue.put(task)
             return
         elif resp.status_code == 404:
+            ## 抓取失败一般是5xx或403, 405等, 出现404基本上就没有重试的意义了, 可以直接放弃
             update_record_status(self.db_conn, task['url'], 'failed')
             return
+        msg = '请求页面成功, 准备解析并保存: task: {task:s}'
+        logger.debug(msg.format(task = str(task)))
 
         try:
             charset = get_page_charset(resp.content)
             resp.encoding = charset
             pq_selector = PyQuery(resp.text)
-
             ## 超过最大深度的页面不再抓取, 在入队列前就先判断.
             ## 但静态资源无所谓深度, 所以还是要抓取的.
             if 0 < self.config['max_depth'] < task['depth'] + 1:
@@ -99,7 +106,7 @@ class Crawler:
             else:
                 parse_linking_pages(pq_selector, task, self.config, callback = self.enqueue_page)
             parse_linking_assets(pq_selector, task, self.config, callback = self.enqueue_asset)
-
+            logger.debug('修改页面元素链接完成')
             ## 抓取此页面上的静态资源
             self.asset_worker_pool.start(task)
             byte_content = pq_selector.outer_html().encode('utf-8')
@@ -116,8 +123,14 @@ class Crawler:
         '''
         msg = 'get_static_asset(): task: {task:s}'
         logger.debug(msg.format(task = str(task)))
+        ## 更新记录状态
+        update_record_status(self.db_conn, task['url'], 'pending')
         ## 如果该链接已经超过了最大尝试次数, 则放弃
-        if task['failed_times'] > self.config['max_retry_times']: return
+        if task['failed_times'] > self.config['max_retry_times']: 
+            msg = '失败次数过多, 不再重试: task: {task:s}'
+            logger.warning(msg.format(task = str(task)))
+            update_record_status(self.db_conn, task['url'], 'failed')
+            return
 
         code, resp = request_get_async(task, self.config)
         if not code:
@@ -125,9 +138,10 @@ class Crawler:
             logger.error(msg.format(task = str(task), err = resp))
             ## 出现异常, 则失败次数加1
             task['failed_times'] += 1
-            self.asset_queue.push(task)
+            self.asset_queue.put(task)
             return
         elif resp.status_code == 404:
+            ## 抓取失败一般是5xx或403, 405等, 出现404基本上就没有重试的意义了, 可以直接放弃
             update_record_status(self.db_conn, task['url'], 'failed')
             return
 
@@ -148,61 +162,24 @@ class Crawler:
         已进入队列的url, 必定已经存在记录, 但不一定能成功下载.
         每50个url入队列都将队列内容备份到数据库, 以免丢失.
         '''
-        if query_url_record(self.db_conn, task['url']): return
-        self.asset_queue.push(task)
-        add_url_record(self.db_conn, task)
-        self.asset_counter += 1
-        if self.asset_counter >= 50: 
-            self.asset_counter = 0
-            self.save_queue()
+        self.asset_queue.put(task)
+        if not query_url_record(self.db_conn, task['url']): 
+            add_url_record(self.db_conn, task)
 
     def enqueue_page(self, task):
-        if query_url_record(self.db_conn, task['url']): return
-        self.page_queue.push(task)
-        add_url_record(self.db_conn, task)
-        self.page_counter += 1
-        if self.page_counter >= 50: 
-            self.page_counter = 0
-            self.save_queue()
+        self.page_queue.put(task)
+        if not query_url_record(self.db_conn, task['url']): 
+            add_url_record(self.db_conn, task)
 
     def load_queue(self):
         logger.debug('初始化任务队列')
-        page_tasks = query_page_tasks(self.db_conn)
+        page_tasks = query_unfinished_page_tasks(self.db_conn)
         for task in page_tasks:
-            self.page_queue.push(task)
-        asset_tasks = query_asset_tasks(self.db_conn)
+            self.page_queue.put(task)
+        asset_tasks = query_unfinished_asset_tasks(self.db_conn)
         for task in asset_tasks:
-            self.asset_queue.push(task)
+            self.asset_queue.put(task)
         logger.debug('初始化任务队列完成')
-
-    def save_queue(self):
-        '''
-        将队列中的任务元素存储到数据库中, 下次启动时加载, 继续执行.
-        '''
-        logger.debug('保存任务队列')
-        page_tasks = []
-        asset_tasks = []
-        _tmp_page_queue = copy.copy(self.page_queue)
-        _tmp_asset_queue = copy.copy(self.asset_queue)
-
-        ## 将队列中的成员写入数据库作为备份
-        while True:
-            if _tmp_page_queue.empty(): break
-            task = _tmp_page_queue.pop()
-            values = (task['url'], task['refer'], task['depth'], task['failed_times'])
-            page_tasks.append(values)
-
-        while True:
-            if _tmp_asset_queue.empty(): break
-            task = _tmp_asset_queue.pop()
-            values = (task['url'], task['refer'], task['depth'], task['failed_times'])
-            asset_tasks.append(values)
-
-        if len(page_tasks) > 0:
-            save_page_task(self.db_conn, page_tasks)
-        if len(asset_tasks) > 0:
-            save_asset_task(self.db_conn, asset_tasks)
-        logger.debug('保存任务队列完成')
 
     def stop(self):
         '''
@@ -211,5 +188,4 @@ class Crawler:
         logger.info('用户取消, 正在终止...')
         self.page_worker_pool.stop()
         self.asset_worker_pool.stop()
-        self.save_queue()
         self.db_conn.close()

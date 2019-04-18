@@ -22,6 +22,10 @@ default_config = {
     'page_pool_size': 20,
     ## 静态资源抓取协程池中协程的数量
     'asset_pool_size': 20,
+    ## 页面任务队列容量(超过容量插入数据会阻塞)
+    'page_queue_size': 10000,
+    ## 静态资源任务队列容量(超过容量插入数据会阻塞)
+    'asset_queue_size': 10000,
     ## 爬取页面的深度, 从1开始计, 爬到第N层为止.
     ## 1表示只抓取单页, 0表示无限制
     'max_depth': 0,
@@ -34,6 +38,8 @@ default_config = {
     'no_css': False,
     'no_images': False,
     'no_fonts': False,
+    'no_audio': False,
+    'no_video': False,
     ## 黑名单, 列表类型. 规则格式为正则, 默认为空.
     'black_list': [],
 
