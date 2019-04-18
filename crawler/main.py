@@ -9,12 +9,14 @@ from urllib.parse import urlparse, urljoin
 
 from pyquery import PyQuery
 
-from page_parser import get_page_charset, parse_linking_pages, parse_linking_assets, parse_css_file
-from utils import empty_link_pattern, request_get_async, save_file_async
-from transform import trans_to_local_path
-from worker_pool import WorkerPool
-from db import init_db, query_url_record, add_url_record, query_page_tasks, query_asset_tasks, save_page_task, save_asset_task, update_record_status
-from cache_queue import CacheQueue
+from crawler.page_parser import get_page_charset, parse_linking_pages, parse_linking_assets, parse_css_file
+from crawler.utils import empty_link_pattern, request_get_async, save_file_async
+from crawler.transform import trans_to_local_path
+from worker.worker_pool import WorkerPool
+from worker.cache_queue import CacheQueue
+from model.db import init_db
+from model.url_record import query_url_record, add_url_record
+from model.task import query_page_tasks, query_asset_tasks, save_page_task, save_asset_task, update_record_status
 
 logger = logging.getLogger(__name__)
 

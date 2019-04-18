@@ -4,7 +4,7 @@ gevent.monkey.patch_all(thread=False)
 import logging
 
 from crawler import Crawler
-from config import default_config
+from crawler.config import default_config
 
 if __name__ == '__main__':
     config = {

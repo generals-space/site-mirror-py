@@ -4,8 +4,8 @@ from urllib.parse import urljoin, urlparse, urldefrag
 
 from pyquery import PyQuery
 
-from utils import charset_pattern, empty_link_pattern, css_url_pattern, url_filter
-from transform import trans_to_local_link
+from crawler.utils import charset_pattern, empty_link_pattern, css_url_pattern, url_filter
+from crawler.transform import trans_to_local_link
 
 logger = logging.getLogger(__name__)
 

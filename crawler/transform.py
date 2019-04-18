@@ -2,7 +2,7 @@ import os
 import re
 from urllib.parse import urlparse, unquote
 
-from utils import special_chars, html_pattern
+from crawler.utils import special_chars, html_pattern
 
 def trans_query_for_local_link(local_link, query_str):
     '''
