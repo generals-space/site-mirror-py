@@ -84,6 +84,7 @@ class Crawler:
             return
         elif resp.status_code == 404:
             update_record_status(self.db_conn, task['url'], 'failed')
+            return
 
         try:
             charset = get_page_charset(resp.content)
@@ -91,7 +92,7 @@ class Crawler:
             pq_selector = PyQuery(resp.text)
 
             ## 超过最大深度的页面不再抓取, 在入队列前就先判断.
-            ## 但超过静态文件无所谓深度, 所以还是要抓取的.
+            ## 但静态资源无所谓深度, 所以还是要抓取的.
             if 0 < self.config['max_depth'] < task['depth'] + 1:
                 msg = '当前页面已达到最大深度, 不再抓取新页面: task {task:s}'
                 logger.warning(msg.format(task = str(task)))
@@ -99,7 +100,7 @@ class Crawler:
                 parse_linking_pages(pq_selector, task, self.config, callback = self.enqueue_page)
             parse_linking_assets(pq_selector, task, self.config, callback = self.enqueue_asset)
 
-            ## 抓取此页面上的静态文件
+            ## 抓取此页面上的静态资源
             self.asset_worker_pool.start(task)
             byte_content = pq_selector.outer_html().encode('utf-8')
             file_path, file_name = trans_to_local_path(task['url'], 'page', self.main_site)
@@ -111,7 +112,7 @@ class Crawler:
 
     def get_static_asset(self, task):
         '''
-        请求静态文件, css/js/img等并存储.
+        请求静态资源, css/js/img等并存储.
         '''
         msg = 'get_static_asset(): task: {task:s}'
         logger.debug(msg.format(task = str(task)))
@@ -128,6 +129,7 @@ class Crawler:
             return
         elif resp.status_code == 404:
             update_record_status(self.db_conn, task['url'], 'failed')
+            return
 
         try:
             content = resp.content
@@ -137,7 +139,7 @@ class Crawler:
             code, data = save_file_async(self.config['site_path'], file_path, file_name, content)
             if code: update_record_status(self.db_conn, task['url'], 'success')
         except Exception as err:
-            msg = '保存静态文件失败: task: {task:s}, err: {err:s}'
+            msg = '保存静态资源失败: task: {task:s}, err: {err:s}'
             logger.error(msg.format(task = str(task), err = err))
 
     def enqueue_asset(self, task):

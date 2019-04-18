@@ -38,7 +38,7 @@ def trans_to_local_link(url, url_type, main_site):
     '''
     @param
         url: 待处理的url, 有时url为动态链接, 包含&, ?等特殊字符, 这种情况下需要对其进行编码.
-        is_page: 是否为页面, 包含.php, .asp等动态页面, 区别于常规静态文件. 我们需要根据这个参数判断是否需要对其加上.html后缀.
+        is_page: 是否为页面, 包含.php, .asp等动态页面, 区别于常规静态资源. 我们需要根据这个参数判断是否需要对其加上.html后缀.
     @return
         local_link: 本地文件存储路径, 用于写入本地html文档中的link/script/img/a等标签的链接属性
     '''
