@@ -7,8 +7,6 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-empty_link_pattern = r'about:blank|javascript:(void\(0\))?'
-
 special_chars = {
     '\\': 'xg',
     ':': 'mh',
@@ -20,8 +18,12 @@ special_chars = {
     ' ': 'kg'
 }
 
-image_pattern = '\.((jpg)|(png)|(bmp)|(jpeg)|(gif)|(webp))$'
-font_pattern = '\.((ttf)|(woff)|(woff2)|(otf)|(eot))$'
+charset_pattern = r'charset\s*=\s*(\S*)\s*;?'
+empty_link_pattern = r'(^$)|(^data:)|(about:blank)|(javascript:)'
+css_url_pattern = r'url\(\'(.*?)\'\)|url\(\"(.*?)\"\)|url\((.*?)\)'
+html_pattern = r'\.((html)|(htm)|(xhtml)|(xml))$'
+image_pattern = r'\.((jpg)|(png)|(bmp)|(jpeg)|(gif)|(webp))$'
+font_pattern = r'\.((ttf)|(woff)|(woff2)|(otf)|(eot))$'
 
 def request_get_async(task, config):
     '''

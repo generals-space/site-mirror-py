@@ -4,7 +4,7 @@ from urllib.parse import urljoin, urlparse, urldefrag
 
 from pyquery import PyQuery
 
-from utils import empty_link_pattern, url_filter
+from utils import charset_pattern, empty_link_pattern, css_url_pattern, url_filter
 from transform import trans_to_local_link
 
 logger = logging.getLogger(__name__)
@@ -18,7 +18,7 @@ def get_page_charset(page_content):
     meta1 = pq('meta[http-equiv]').attr('content')
     meta2 = pq('meta[charset]').attr('charset')
     if meta1 is not None:
-        res = re.findall(r'charset\s*=\s*(\S*)\s*;?', meta1)
+        res = re.findall(charset_pattern, meta1)
         if len(res) != 0: charset = res[0]
     if meta2 is not None: charset = meta2
     return charset
@@ -113,16 +113,12 @@ def parse_css_file(content, task, config, callback = None):
     ## 格式可能为url('./bg.jpg'), url("./bg.jpg"), url(bg.jpg)
     ## 如下， import_list可能是[('', '', 'bg.jpg'), ('', '', 'logo.png')]
     ## 元组中前两个空格表示匹配到的都是url(bg.jpg)这种形式的属性
-    import_pattern = r'url\(\'(.*?)\'\)|url\(\"(.*?)\"\)|url\((.*?)\)'
-    match_list = re.findall(import_pattern, content)
+    match_list = re.findall(css_url_pattern, content)
     for match_item in match_list:
         for match_url in match_item:
             ## url属性的匹配模式有3种, 只有一种会被匹配上, 另外两种就是空
             ## 如果为空, 或是引入了base64数据, 就跳过不进行处理
-            if match_url == '' \
-                or match_url.startswith('data') \
-                or re.search(empty_link_pattern, match_url): 
-                continue
+            if re.search(empty_link_pattern, match_url): continue
 
             full_url = urljoin(task['url'], match_url)
             ## 如果不满足过滤规则则跳过

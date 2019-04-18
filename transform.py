@@ -1,22 +1,27 @@
 import os
+import re
 from urllib.parse import urlparse, unquote
 
-from utils import special_chars
+from utils import special_chars, html_pattern
+
+def trans_query_for_local_link(local_link, query_str):
+    '''
+    将url中query部分中的特殊字符替换掉, 防止在写入本地文件时文件名非法.
+    '''
+    for k, v in special_chars.items():
+        if k in query_str: query_str = query_str.replace(k, v)
+    local_link = local_link + special_chars['?'] + query_str
+    return local_link
 
 def trans_to_local_link_for_page(urlObj):
     origin_path = urlObj.path
     origin_query = urlObj.query
 
     local_link = origin_path
-    if local_link == "": local_link = 'index.html'
+    if local_link == '': local_link = 'index.html'
     if local_link.endswith('/'): local_link += 'index.html'
-    if origin_query != '': 
-        query_str = origin_query
-        for k, v in special_chars.items():
-            if k in query_str: query_str = query_str.replace(k, v)
-        local_link = local_link + special_chars['?'] + query_str
-    if not local_link.endswith('.html') and not local_link.endswith('.htm'):
-        local_link += '.html'
+    if origin_query != '': local_link = trans_query_for_local_link(local_link, origin_query)
+    if not re.search(html_pattern, local_link): local_link += '.html'
     return local_link
 
 def trans_to_local_link_for_asset(urlObj):
@@ -24,13 +29,9 @@ def trans_to_local_link_for_asset(urlObj):
     origin_query = urlObj.query
 
     local_link = origin_path
-    if local_link == "": local_link = 'index'
+    if local_link == '': local_link = 'index'
     if local_link.endswith('/'): local_link += 'index'
-    if origin_query != '': 
-        query_str = origin_query
-        for k, v in special_chars.items():
-            if k in query_str: query_str = query_str.replace(k, v)
-        local_link = local_link + special_chars['?'] + query_str
+    if origin_query != '': local_link = trans_query_for_local_link(local_link, origin_query)
     return local_link
 
 def trans_to_local_link(url, url_type, main_site):
@@ -65,7 +66,7 @@ def trans_to_local_link(url, url_type, main_site):
 def trans_to_local_path(url, url_type, main_site):
     '''
     @return
-        file_path: 目标文件的存储目录, 相对路径(不以/开头), 为""时, 表示当前目录
+        file_path: 目标文件的存储目录, 相对路径(不以/开头), 为''时, 表示当前目录
         file_name: 目标文件名称
     '''
     local_link = trans_to_local_link(url, url_type, main_site)
