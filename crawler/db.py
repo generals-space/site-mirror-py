@@ -42,7 +42,7 @@ def add_or_update_url_record(db_conn, task):
     row_id = 0
     row = query_url_record(db_conn, task['url'])
     if row:
-        sql_str = 'update url_records set failed_times = ? where url = ?'
+        sql_str = "update url_records set failed_times = ?, status = 'pending' where url = ?"
         cursor = db_conn.cursor()
         cursor.execute(sql_str, (task['failed_times'], task['url'], ))
         row_id = row[0]
