@@ -23,8 +23,8 @@ class Crawler:
         ## 队列满时put会使整个进程阻塞无法继续执行, 之后要改成异步形式
         ## self.page_queue = Queue(maxsize = config['page_queue_size'])
         ## self.asset_queue = Queue(maxsize = config['asset_queue_size'])
-        self.page_queue = Queue(maxsize = config['page_queue_size'])
-        self.asset_queue = Queue(maxsize = config['asset_queue_size'])
+        self.page_queue = Queue()
+        self.asset_queue = Queue()
 
         self.config = config
 
