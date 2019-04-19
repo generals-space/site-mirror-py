@@ -35,19 +35,27 @@ def query_url_record(db_conn, url):
     cursor.close()
     return row
 
-def add_url_record(db_conn, task):
+def add_or_update_url_record(db_conn, task):
     '''
-    return: 返回新插入行的id
+    @return: 新插入行(或更新行)的id
     '''
-    sql_str = 'insert into url_records(url, refer, depth, url_type) values(?, ?, ?, ?)'
-    cursor = db_conn.cursor()
-    cursor.execute(sql_str, (task['url'], task['refer'], task['depth'], task['url_type'], ))
-    ## 获取新插入数据id的方法
-    last_id = cursor.lastrowid
+    row_id = 0
+    row = query_url_record(db_conn, task['url'])
+    if row:
+        sql_str = 'update url_records set failed_times = ? where url = ?'
+        cursor = db_conn.cursor()
+        cursor.execute(sql_str, (task['failed_times'], task['url'], ))
+        row_id = row[0]
+    else:
+        sql_str = 'insert into url_records(url, refer, depth, url_type) values(?, ?, ?, ?)'
+        cursor = db_conn.cursor()
+        cursor.execute(sql_str, (task['url'], task['refer'], task['depth'], task['url_type'], ))
+        ## 获取新插入数据id的方法
+        row_id = cursor.lastrowid
     ## 默认关闭自动提交
     db_conn.commit()
     cursor.close()
-    return last_id
+    return row_id
 
 def update_record_status(db_conn, url, status):
     '''

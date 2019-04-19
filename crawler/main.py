@@ -14,7 +14,7 @@ from crawler.page_parser import get_page_charset, parse_linking_pages, parse_lin
 from crawler.utils import empty_link_pattern, request_get_async, save_file_async
 from crawler.transform import trans_to_local_path
 from crawler.worker_pool import WorkerPool
-from crawler.db import init_db, query_unfinished_page_tasks, query_unfinished_asset_tasks, query_url_record, add_url_record, update_record_status
+from crawler.db import init_db, query_unfinished_page_tasks, query_unfinished_asset_tasks, add_or_update_url_record, update_record_status
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +85,7 @@ class Crawler:
             ## 出现异常, 则失败次数加1
             ## 不需要调用enqueue(), 直接入队列.
             task['failed_times'] += 1
-            self.page_queue.put(task)
+            self.enqueue_page(task)
             return
         elif resp.status_code == 404:
             ## 抓取失败一般是5xx或403, 405等, 出现404基本上就没有重试的意义了, 可以直接放弃
@@ -138,7 +138,7 @@ class Crawler:
             logger.error(msg.format(task = str(task), err = resp))
             ## 出现异常, 则失败次数加1
             task['failed_times'] += 1
-            self.asset_queue.put(task)
+            self.enqueue_asset(task)
             return
         elif resp.status_code == 404:
             ## 抓取失败一般是5xx或403, 405等, 出现404基本上就没有重试的意义了, 可以直接放弃
@@ -163,13 +163,11 @@ class Crawler:
         每50个url入队列都将队列内容备份到数据库, 以免丢失.
         '''
         self.asset_queue.put(task)
-        if not query_url_record(self.db_conn, task['url']): 
-            add_url_record(self.db_conn, task)
+        add_or_update_url_record(self.db_conn, task)
 
     def enqueue_page(self, task):
         self.page_queue.put(task)
-        if not query_url_record(self.db_conn, task['url']): 
-            add_url_record(self.db_conn, task)
+        add_or_update_url_record(self.db_conn, task)
 
     def load_queue(self):
         logger.debug('初始化任务队列')
