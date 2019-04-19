@@ -115,7 +115,7 @@ class Crawler:
             if code: update_record_status(self.db_conn, task['url'], 'success')
         except Exception as err:
             msg = '保存页面文件失败: task: {task:s}, err: {err:s}'
-            logger.error(msg.format(task = str(task), err = err))
+            logger.error(msg.format(task = str(task), err = repr(err)))
 
     def get_static_asset(self, task):
         '''
@@ -135,7 +135,7 @@ class Crawler:
         code, resp = request_get_async(task, self.config)
         if not code:
             msg = '请求静态资源失败, 重新入队列: task: {task:s}, err: {err:s}'
-            logger.error(msg.format(task = str(task), err = resp))
+            logger.error(msg.format(task = str(task), err = repr(resp)))
             ## 出现异常, 则失败次数加1
             task['failed_times'] += 1
             self.enqueue_asset(task)
@@ -154,7 +154,7 @@ class Crawler:
             if code: update_record_status(self.db_conn, task['url'], 'success')
         except Exception as err:
             msg = '保存静态资源失败: task: {task:s}, err: {err:s}'
-            logger.error(msg.format(task = str(task), err = err))
+            logger.error(msg.format(task = str(task), err = repr(err)))
 
     def enqueue_asset(self, task):
         '''

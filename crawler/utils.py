@@ -30,24 +30,24 @@ def request_get_async(task, config):
     协程形式发起get请求
     return: requests.get()的结果
     '''
+    _headers = config['headers'].copy()
+    _headers['Referer'] = task['refer'].encode('utf-8')
+    request_options = {
+        'url': task['url'],
+        'verify': True,
+        'headers': _headers,
+        'proxies': config['proxies'],
+    }
     try:
-        _headers = config['headers'].copy()
-        _headers['Referer'] = task['refer'].encode('utf-8')
-        request_options = {
-            'url': task['url'],
-            'verify': True,
-            'headers': _headers,
-            'proxies': config['proxies'],
-        }
         resp = requests.get(**request_options)
         return (1, resp)
     except requests.exceptions.ConnectionError as err:
         msg = '连接异常: task: {task:s}, err: {err:s}'
-        logger.error(msg.format(task = str(task), err = err))
+        logger.error(msg.format(task = str(task), err = repr(err)))
         return (0, err)
     except Exception as err:
         msg = '请求失败: task: {task:s}, err: {err:s}'
-        logger.error(msg.format(task = str(task), err = err))
+        logger.error(msg.format(task = str(task), err = repr(err)))
         return (0, err)
 
 def save_file_async(site_path, file_path, file_name, byte_content):
@@ -65,7 +65,7 @@ def save_file_async(site_path, file_path, file_name, byte_content):
         return (1, None)
     except IOError as err:
         msg = '保存文件失败: path: {path:s}, file: {file:s}, err: {err:s}'
-        logger.error(msg.format(path = path, file = file_name, err = err))
+        logger.error(msg.format(path = path, file = file_name, err = repr(err)))
         return (0, err)
 
 def url_filter(url, url_type, config):
