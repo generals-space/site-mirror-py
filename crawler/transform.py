@@ -20,6 +20,7 @@ def trans_to_local_link_for_page(urlObj):
     local_link = origin_path
     if local_link == '': local_link = 'index.html'
     if local_link.endswith('/'): local_link += 'index.html'
+    ## 有些静态文件通过query参数表示版本号, 带上这个可以避免缓存问题
     if origin_query != '': local_link = trans_query_for_local_link(local_link, origin_query)
     if not re.search(html_pattern, local_link): local_link += '.html'
     return local_link
