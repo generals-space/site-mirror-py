@@ -77,6 +77,12 @@ def parse_linking_assets(pq_selector, task, config, callback = None):
     img_list = pq_selector('img')
     _parse_linking_assets(img_list, 'src', task, config, callback)
 
+    video_list = pq_selector('video')
+    _parse_linking_assets(video_list, 'src', task, config, callback)
+
+    audio_list = pq_selector('audio')
+    _parse_linking_assets(audio_list, 'src', task, config, callback)
+
 def _parse_linking_assets(node_list, attr_name, task, config, callback):
     main_site = urlparse(config['main_url']).netloc
     for node_item in node_list:
