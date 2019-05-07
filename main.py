@@ -8,11 +8,11 @@ from crawler.config import default_config
 
 if __name__ == '__main__':
     config = {
-        'main_url': 'https://m.xieeda.com/',
+        'main_url': 'https://www.lewenxiaoshuo.com/',
         'headers': {
-            'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 11_0 like Mac OS X) AppleWebKit/604.1.38 (KHTML, like Gecko) Version/11.0 Mobile/15A372 Safari/604.1'
+            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.86 Safari/537.36'
         },
-        'max_depth': 2,
+        'max_depth': 1,
         'logging_config': {
             'level': logging.DEBUG,
             ## %(name)s表示模块路径(其实是__name__的值)
