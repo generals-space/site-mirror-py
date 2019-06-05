@@ -22,3 +22,9 @@
 实现逻辑相同.
 
 python版本: 3.7
+
+------
+
+效果截图
+
+![](./doc/src/screenshot.jpg)
