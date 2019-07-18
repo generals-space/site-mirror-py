@@ -41,7 +41,11 @@ default_config = {
     'no_audio': False,
     'no_video': False,
     ## 黑名单, 列表类型. 规则格式为正则, 默认为空.
-    'black_list': [],
+    'black_list': [
+        # '/login/*'
+        # '/admin/*'
+        # '/comments/*'
+    ],
 
     'logging_config': {
         'level': logging.INFO,
